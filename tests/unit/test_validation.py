@@ -1,0 +1,118 @@
+from datetime import datetime, timezone
+
+from forecasting_assistant.application.normalization import normalize_value
+from forecasting_assistant.application.validation import validate_dialogue, validate_slot
+from forecasting_assistant.domain.models import SlotState, SlotStatus
+from forecasting_assistant.domain.schema import create_initial_state, load_schema
+
+
+def _slot(slot_id: str, value) -> SlotState:
+    return SlotState(
+        slot_id=slot_id,
+        value=value,
+        status=SlotStatus.PROVIDED,
+        evidence_text=f"value for {slot_id}",
+    )
+
+
+def _dialogue(**values):
+    schema = load_schema()
+    state = create_initial_state(schema)
+    for slot_id, value in values.items():
+        state.slots[slot_id] = _slot(slot_id, value)
+    return schema, state
+
+
+def test_percentage_rejects_values_above_one_hundred() -> None:
+    definition = load_schema().get("minimum_coverage")
+
+    assert validate_slot(definition, _slot("minimum_coverage", 120))[0].code == "percentage_range"
+
+
+def test_horizon_requires_positive_periods() -> None:
+    schema, state = _dialogue(forecast_horizon={"periods": 0, "unit": "month"})
+
+    assert any(issue.code == "positive_duration" for issue in validate_dialogue(schema, state))
+
+
+def test_normalization_handles_schema_value_types() -> None:
+    schema = load_schema()
+    assert normalize_value(schema.get("forecast_type"), " Point ") == "point"
+    assert normalize_value(schema.get("known_seasonality"), "YES") is True
+    assert normalize_value(schema.get("prediction_interval_levels"), [80, "95"]) == [80.0, 95.0]
+    assert normalize_value(schema.get("seasonal_periods"), "7, 12") == [7, 12]
+    assert normalize_value(schema.get("geography"), "PK, US") == ["PK", "US"]
+    assert normalize_value(schema.get("frequency"), {"periods": "2", "unit": "HOUR"}) == {
+        "periods": 2,
+        "unit": "hour",
+    }
+
+
+def test_normalization_converts_datetimes_and_iana_timezones() -> None:
+    schema = load_schema()
+    value = normalize_value(schema.get("forecast_start"), "2026-01-02T03:04:05Z")
+
+    assert value == datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    assert normalize_value(schema.get("timezone"), "Asia/Karachi") == "Asia/Karachi"
+
+
+def test_invalid_timezone_is_a_validation_issue_not_exception() -> None:
+    issue = validate_slot(load_schema().get("timezone"), _slot("timezone", "Mars/Olympus"))[0]
+
+    assert issue.code == "iana_timezone"
+
+
+def test_cross_field_history_dates_must_be_ordered() -> None:
+    schema, state = _dialogue(history_start="2026-02-01T00:00:00Z", history_end="2026-01-01T00:00:00Z")
+
+    assert any(issue.code == "history_order" for issue in validate_dialogue(schema, state))
+
+
+def test_cross_field_forecast_start_cannot_precede_cutoff() -> None:
+    schema, state = _dialogue(forecast_start="2026-01-01T00:00:00Z", data_cutoff="2026-02-01T00:00:00Z")
+
+    assert any(issue.code == "forecast_start_after_cutoff" for issue in validate_dialogue(schema, state))
+
+
+def test_panel_requires_series_identifiers() -> None:
+    schema, state = _dialogue(dataset_type="panel")
+
+    assert any(issue.code == "series_id_columns_required" for issue in validate_dialogue(schema, state))
+
+
+def test_hierarchical_requires_hierarchy_columns() -> None:
+    schema, state = _dialogue(dataset_type="hierarchical", series_id_columns=["store"])
+
+    assert any(issue.code == "hierarchy_columns_required" for issue in validate_dialogue(schema, state))
+
+
+def test_probabilistic_output_requires_intervals_or_quantiles() -> None:
+    schema, state = _dialogue(forecast_type="probabilistic")
+
+    assert any(issue.code == "probabilistic_output_required" for issue in validate_dialogue(schema, state))
+
+
+def test_future_covariates_require_availability() -> None:
+    schema, state = _dialogue(known_future_covariates=["price"])
+
+    assert any(issue.code == "covariate_availability_required" for issue in validate_dialogue(schema, state))
+
+
+def test_authentication_reference_requires_secret_scheme() -> None:
+    issue = validate_slot(
+        load_schema().get("authentication_reference"), _slot("authentication_reference", "api-key-value")
+    )[0]
+
+    assert issue.code == "secret_reference"
+
+
+def test_raw_credentials_are_rejected() -> None:
+    for value in ("sk-test", "api_key=abc", "password=abc", "Bearer abc", "token=abc"):
+        issues = validate_slot(load_schema().get("source_reference"), _slot("source_reference", value))
+        assert any(issue.code == "raw_credential" for issue in issues), value
+
+
+def test_probability_values_must_be_between_zero_and_one() -> None:
+    definition = load_schema().get("quantiles")
+
+    assert validate_slot(definition, _slot("quantiles", [1.2]))[0].code == "probability_range"
