@@ -1,4 +1,7 @@
 import json
+from datetime import date, datetime, time
+
+import pytest
 
 from forecasting_assistant.domain.models import SlotState, SlotStatus
 from forecasting_assistant.domain.schema import create_initial_state, load_schema
@@ -58,3 +61,66 @@ def test_input_contains_active_slot_definitions_and_safe_context_only() -> None:
     assert "hierarchy_columns" not in serialized
     assert "vault://prod/api-key" not in serialized
     assert "super-secret" not in serialized
+
+
+@pytest.mark.parametrize(
+    ("message", "secret"),
+    [
+        ("The password is hunter2.", "hunter2"),
+        ("The api key is sk-test-secret-value.", "sk-test-secret-value"),
+        ("password: hunter2", "hunter2"),
+        ("api_key=abc123", "abc123"),
+        ("Use https://alice:hunter2@example.com/data", "alice:hunter2"),
+        ("Authorization: Bearer bearer-secret", "bearer-secret"),
+        ("Authorization: Digest username=alice, response=digest-secret", "digest-secret"),
+        ("https://example.test/data?api_key=query-secret&limit=10", "query-secret"),
+        ("https://example.test/data?X-Amz-Signature=sig-secret", "sig-secret"),
+        ("AWS key AKIAIOSFODNN7EXAMPLE", "AKIAIOSFODNN7EXAMPLE"),
+        ("signature is signature-secret", "signature-secret"),
+    ],
+)
+def test_redacts_credential_forms_from_current_message(message: str, secret: str) -> None:
+    payload = json.loads(build_extractor_input(message, create_initial_state(load_schema()), load_schema()))
+
+    assert secret not in json.dumps(payload)
+
+
+def test_redacts_nested_state_values_and_serializes_json_safe_values() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    state.slots["source_reference"] = SlotState(
+        slot_id="source_reference",
+        value={
+            "captured_at": datetime(2026, 7, 15, 12, 30),
+            "date_only": date(2026, 7, 15),
+            "time_only": time(12, 30),
+            "scopes": {"read", "write"},
+            "credentials": {"password": "nested-secret"},
+            "unsupported": object(),
+        },
+        status=SlotStatus.PROVIDED,
+        evidence_text="password=nested-secret",
+    )
+
+    payload = json.loads(build_extractor_input("safe message", state, schema))
+    value = next(item["value"] for item in payload["unconfirmed_slots"] if item["slot_id"] == "source_reference")
+
+    assert value["captured_at"] == "2026-07-15T12:30:00"
+    assert value["date_only"] == "2026-07-15"
+    assert value["time_only"] == "12:30:00"
+    assert sorted(value["scopes"]) == ["read", "write"]
+    assert value["credentials"]["password"] == "[REDACTED]"
+    assert "nested-secret" not in json.dumps(payload)
+
+
+def test_preserves_benign_filename_text() -> None:
+    payload = json.loads(
+        build_extractor_input(
+            "Use api_key_reference.csv and password_reset.csv.",
+            create_initial_state(load_schema()),
+            load_schema(),
+        )
+    )
+
+    assert "api_key_reference.csv" in payload["current_message"]
+    assert "password_reset.csv" in payload["current_message"]

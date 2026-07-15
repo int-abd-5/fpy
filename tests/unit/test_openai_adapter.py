@@ -26,6 +26,11 @@ class InjectedClient:
         self.responses = responses
 
 
+class RaisingResponses:
+    async def parse(self, **kwargs: object) -> SimpleNamespace:
+        raise TimeoutError("provider timed out")
+
+
 def _result() -> ExtractorResult:
     return ExtractorResult(intent=Intent.CREATE_FORECAST, intent_confidence=0.99)
 
@@ -53,6 +58,17 @@ async def test_adapter_rejects_missing_parsed_output() -> None:
 
     with pytest.raises(LLMContractError, match="extractor returned no parsed output"):
         await adapter.extract("I need a forecast.", create_initial_state(load_schema()))
+
+
+@pytest.mark.asyncio
+async def test_adapter_wraps_provider_exception_with_chaining() -> None:
+    client = InjectedClient(RaisingResponses())
+    adapter = OpenAIResponsesClient("unused-key", "configured-model", load_schema(), client=client)
+
+    with pytest.raises(LLMContractError, match="extractor provider request failed") as error:
+        await adapter.extract("I need a forecast.", create_initial_state(load_schema()))
+
+    assert isinstance(error.value.__cause__, TimeoutError)
 
 
 @pytest.mark.asyncio

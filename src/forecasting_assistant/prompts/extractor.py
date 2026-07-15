@@ -2,18 +2,46 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date, datetime, time
+from enum import Enum
 from typing import Any
+
+from pydantic import BaseModel
 
 from forecasting_assistant.domain.conditions import is_slot_active
 from forecasting_assistant.domain.models import DialogueState, SlotState, SlotStatus
 from forecasting_assistant.domain.schema import ForecastingSchema
 
 
+_URI_USERINFO_PATTERN = re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)[^/\s:@]+:[^@\s]+@")
 _SECRET_PATTERNS = (
-    re.compile(r"(?i)(?:api[_ -]?key|apikey|password|passwd|token|secret)\s*[:=]\s*[^\s,;]+"),
-    re.compile(r"\bsk-[A-Za-z0-9_-]+\b"),
-    re.compile(r"\b(?:Bearer|Basic)\s+[A-Za-z0-9+/=._-]+\b", re.IGNORECASE),
+    re.compile(r"(?i)\bDigest\s+[^\r\n]+"),
+    re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+"),
+    re.compile(r"(?i)\bBasic\s+[A-Za-z0-9+/=._-]+"),
+    re.compile(
+        r"(?ix)\b(?:api[_ -]?key|apikey|password|passwd|passcode|token|access[_ -]?token|"
+        r"refresh[_ -]?token|client[_ -]?secret|private[_ -]?key|secret|credential|"
+        r"authorization|signature|sig|oauth[_ -]?signature|x-amz-(?:signature|credential)|"
+        r"awsaccesskeyid)\s*(?:is|are|=|:|->)\s*(?:\"[^\"]*\"|'[^']*'|[^\s,;&]+)"
+    ),
+    re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
+    re.compile(r"\bsk-(?:proj-|live-|admin-)?[A-Za-z0-9_-]{8,}\b"),
 )
+
+_SECRET_KEY_NAMES = {
+    "accesskey",
+    "apikey",
+    "authorization",
+    "clientsecret",
+    "credential",
+    "password",
+    "passwd",
+    "privatekey",
+    "refreshtoken",
+    "secret",
+    "signature",
+    "token",
+}
 
 
 def build_extractor_instructions() -> str:
@@ -31,23 +59,51 @@ def build_extractor_instructions() -> str:
 
 
 def _redact_text(value: str) -> str:
+    value = _URI_USERINFO_PATTERN.sub(r"\1[REDACTED]@", value)
     for pattern in _SECRET_PATTERNS:
         value = pattern.sub("[REDACTED]", value)
     return value
 
 
+def _is_secret_key(key: object) -> bool:
+    normalized = re.sub(r"[^a-z0-9]", "", str(key).lower())
+    return (
+        normalized in _SECRET_KEY_NAMES
+        or normalized.endswith(("password", "passwd", "token", "secret", "signature"))
+        or normalized.startswith(("apikey", "accesskey", "privatekey"))
+        or ("credential" in normalized and normalized != "credentials")
+        or normalized == "authorization"
+    )
+
+
+def _stable_sort_key(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+
+
 def _safe_value(value: Any, *, secret: bool = False) -> Any:
     if secret:
         return "[REDACTED]"
+    if isinstance(value, Enum):
+        return _safe_value(value.value)
+    if isinstance(value, BaseModel):
+        return _safe_value(value.model_dump(mode="python"))
+    if isinstance(value, (datetime, date, time)):
+        return value.isoformat()
     if isinstance(value, str):
         return _redact_text(value)
     if isinstance(value, dict):
-        return {str(key): _safe_value(item) for key, item in value.items()}
+        return {
+            str(_safe_value(key)): _safe_value(item, secret=_is_secret_key(key))
+            for key, item in value.items()
+        }
     if isinstance(value, list):
         return [_safe_value(item) for item in value]
-    if isinstance(value, tuple):
-        return [_safe_value(item) for item in value]
-    return value
+    if isinstance(value, (tuple, set, frozenset)):
+        values = [_safe_value(item) for item in value]
+        return sorted(values, key=_stable_sort_key) if isinstance(value, (set, frozenset)) else values
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    return f"<{type(value).__name__}>"
 
 
 def _context_slot(slot: SlotState) -> dict[str, Any]:
@@ -65,7 +121,7 @@ def build_extractor_input(
     current_message: str, state: DialogueState, schema: ForecastingSchema
 ) -> str:
     active_definitions = [
-        {"slot_id": definition.slot_id, "description": definition.description}
+        {"slot_id": definition.slot_id, "description": _redact_text(definition.description)}
         for definition in schema.slots
         if is_slot_active(definition, state)
     ]

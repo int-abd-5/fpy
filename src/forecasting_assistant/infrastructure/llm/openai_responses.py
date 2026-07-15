@@ -28,13 +28,18 @@ class OpenAIResponsesClient:
         self._schema = schema
 
     async def extract(self, message: str, state: DialogueState) -> ExtractorResult:
-        response = await self._client.responses.parse(
-            model=self._model,
-            instructions=build_extractor_instructions(),
-            input=build_extractor_input(message, state, self._schema),
-            text_format=ExtractorResult,
-            store=False,
-        )
-        if response.output_parsed is None:
-            raise LLMContractError("extractor returned no parsed output")
-        return response.output_parsed
+        try:
+            response = await self._client.responses.parse(
+                model=self._model,
+                instructions=build_extractor_instructions(),
+                input=build_extractor_input(message, state, self._schema),
+                text_format=ExtractorResult,
+                store=False,
+            )
+            if response.output_parsed is None:
+                raise LLMContractError("extractor returned no parsed output")
+            return response.output_parsed
+        except LLMContractError:
+            raise
+        except Exception as error:
+            raise LLMContractError("extractor provider request failed") from error
