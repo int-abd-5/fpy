@@ -12,7 +12,16 @@ _DURATION_UNITS = {
     "day": "day", "days": "day", "daily": "day",
     "week": "week", "weeks": "week", "weekly": "week",
     "month": "month", "months": "month", "monthly": "month",
+    "quarter": "quarter", "quarters": "quarter", "quarterly": "quarter",
     "year": "year", "years": "year", "yearly": "year",
+}
+
+_FIXED_DURATION_SECONDS = {
+    "second": 1,
+    "minute": 60,
+    "hour": 3600,
+    "day": 86400,
+    "week": 604800,
 }
 
 
@@ -44,30 +53,36 @@ def _mentioned(state: DialogueState, slot_id: str) -> bool:
 def _duration_unit(state: DialogueState, slot_id: str) -> str | None:
     value = _value(state, slot_id)
     if isinstance(value, dict) and value.get("unit") is not None:
-        return str(value["unit"]).lower()
+        return _DURATION_UNITS.get(str(value["unit"]).strip().lower())
     return None
 
 
-def _same_granularity(state: DialogueState) -> bool:
-    def semantics(value: object) -> tuple[float, str] | None:
-        if isinstance(value, dict):
-            try:
-                periods = float(value["periods"])
-                unit = _DURATION_UNITS[str(value["unit"]).strip().lower()]
-                return periods, unit
-            except (KeyError, TypeError, ValueError):
-                return None
-        if isinstance(value, str):
-            match = re.fullmatch(r"\s*(?:(\d+(?:\.\d+)?)\s*)?([a-zA-Z_]+)\s*", value)
-            if match:
-                periods = float(match.group(1) or 1)
-                unit = _DURATION_UNITS.get(match.group(2).lower())
-                return (periods, unit) if unit else None
+def _duration_semantics(value: object) -> tuple[float, str] | None:
+    if isinstance(value, dict):
+        try:
+            periods = float(value["periods"])
+            unit = _DURATION_UNITS[str(value["unit"]).strip().lower()]
+        except (KeyError, TypeError, ValueError):
+            return None
+    elif isinstance(value, str):
+        match = re.fullmatch(r"\s*(?:(\d+(?:\.\d+)?)\s*)?([a-zA-Z_]+)\s*", value)
+        if not match:
+            return None
+        periods = float(match.group(1) or 1)
+        unit = _DURATION_UNITS.get(match.group(2).lower())
+        if unit is None:
+            return None
+    else:
         return None
+    if unit in _FIXED_DURATION_SECONDS:
+        return periods * _FIXED_DURATION_SECONDS[unit], "fixed"
+    return periods, unit
 
-    return semantics(_value(state, "frequency")) == semantics(_value(state, "output_granularity")) and semantics(
-        _value(state, "frequency")
-    ) is not None
+
+def _same_granularity(state: DialogueState) -> bool:
+    frequency = _duration_semantics(_value(state, "frequency"))
+    output = _duration_semantics(_value(state, "output_granularity"))
+    return frequency is not None and frequency == output
 
 
 def _multi_geography(state: DialogueState) -> bool:

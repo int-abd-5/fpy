@@ -118,7 +118,7 @@ def test_raw_credentials_are_rejected() -> None:
         "api_key=abc",
         "api key: abc",
         "access-token = abc",
-        "access token abc",
+        "access token: abc",
         "password=abc",
         "passwd : abc",
         "secret: abc",
@@ -139,9 +139,24 @@ def test_secret_references_are_not_flagged_as_raw_credentials() -> None:
 
 
 def test_benign_secret_phrase_is_not_a_raw_credential() -> None:
-    issues = validate_slot(load_schema().get("source_reference"), _slot("source_reference", "secret garden.csv"))
+    definition = load_schema().get("source_reference")
+    for value in ("token bucket.csv", "password policy.pdf", "access token guide.pdf", "secret garden.csv"):
+        issues = validate_slot(definition, _slot("source_reference", value))
+        assert not any(issue.code == "raw_credential" for issue in issues), value
 
-    assert not any(issue.code == "raw_credential" for issue in issues)
+
+def test_credential_assignments_and_authorization_forms_are_rejected() -> None:
+    definition = load_schema().get("source_reference")
+    for value in (
+        "token=abc",
+        "password: abc",
+        '{"access_token": "abc"}',
+        "https://example.test/data?token=abc",
+        "Authorization: Bearer abc",
+        "AKIAIOSFODNN7EXAMPLE",
+    ):
+        issues = validate_slot(definition, _slot("source_reference", value))
+        assert any(issue.code == "raw_credential" for issue in issues), value
 
 
 def test_mixed_naive_and_aware_history_dates_return_issue() -> None:

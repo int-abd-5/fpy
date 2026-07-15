@@ -124,3 +124,22 @@ def test_granularity_compares_periods_and_common_aliases() -> None:
 
     state.slots["output_granularity"].value = "daily"
     assert is_slot_active(schema.get("aggregation_level"), state)
+
+
+def test_all_sub_daily_aliases_activate_timezone() -> None:
+    schema = load_schema()
+    for unit in ("second", "seconds", "secondly", "minute", "minutes", "minutely", "hour", "hours", "hourly"):
+        _, state = _state(frequency={"periods": 1, "unit": unit})
+        assert is_slot_active(schema.get("timezone"), state), unit
+
+
+def test_fixed_duration_magnitude_equivalence_does_not_activate_aggregation() -> None:
+    schema, state = _state(frequency={"periods": 60, "unit": "minutes"}, output_granularity="hourly")
+
+    assert not is_slot_active(schema.get("aggregation_level"), state)
+
+
+def test_calendar_duration_aliases_compare_by_period_and_canonical_unit() -> None:
+    schema, state = _state(frequency={"periods": 2, "unit": "quarters"}, output_granularity="2 quarterly")
+
+    assert not is_slot_active(schema.get("aggregation_level"), state)
