@@ -80,26 +80,26 @@ def _stable_sort_key(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
 
 
-def _safe_value(value: Any, *, secret: bool = False) -> Any:
+def safe_provider_value(value: Any, *, secret: bool = False) -> Any:
     if secret:
         return "[REDACTED]"
     if isinstance(value, Enum):
-        return _safe_value(value.value)
+        return safe_provider_value(value.value)
     if isinstance(value, BaseModel):
-        return _safe_value(value.model_dump(mode="python"))
+        return safe_provider_value(value.model_dump(mode="python"))
     if isinstance(value, (datetime, date, time)):
         return value.isoformat()
     if isinstance(value, str):
         return _redact_text(value)
     if isinstance(value, dict):
         return {
-            str(_safe_value(key)): _safe_value(item, secret=_is_secret_key(key))
+            str(safe_provider_value(key)): safe_provider_value(item, secret=_is_secret_key(key))
             for key, item in value.items()
         }
     if isinstance(value, list):
-        return [_safe_value(item) for item in value]
+        return [safe_provider_value(item) for item in value]
     if isinstance(value, (tuple, set, frozenset)):
-        values = [_safe_value(item) for item in value]
+        values = [safe_provider_value(item) for item in value]
         return sorted(values, key=_stable_sort_key) if isinstance(value, (set, frozenset)) else values
     if value is None or isinstance(value, (bool, int, float)):
         return value
@@ -110,9 +110,9 @@ def _context_slot(slot: SlotState) -> dict[str, Any]:
     is_secret = slot.slot_id == "authentication_reference"
     return {
         "slot_id": slot.slot_id,
-        "value": _safe_value(slot.value, secret=is_secret),
+        "value": safe_provider_value(slot.value, secret=is_secret),
         "status": slot.status.value,
-        "evidence_text": "[REDACTED]" if is_secret else _safe_value(slot.evidence_text),
+        "evidence_text": "[REDACTED]" if is_secret else safe_provider_value(slot.evidence_text),
         "confirmed_by_user": slot.confirmed_by_user,
     }
 

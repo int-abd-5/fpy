@@ -2,11 +2,20 @@ from __future__ import annotations
 
 from openai import AsyncOpenAI
 
-from forecasting_assistant.domain.models import DialogueState, ExtractorResult
+from forecasting_assistant.domain.models import (
+    DialogueState,
+    ExtractorResult,
+    QuestionOutput,
+    QuestionRequest,
+)
 from forecasting_assistant.domain.schema import ForecastingSchema
 from forecasting_assistant.prompts.extractor import (
     build_extractor_input,
     build_extractor_instructions,
+)
+from forecasting_assistant.prompts.llmrei_long import (
+    build_question_input,
+    build_question_instructions,
 )
 
 
@@ -43,3 +52,20 @@ class OpenAIResponsesClient:
             raise
         except Exception as error:
             raise LLMContractError("extractor provider request failed") from error
+
+    async def ask(self, request: QuestionRequest) -> QuestionOutput:
+        try:
+            response = await self._client.responses.parse(
+                model=self._model,
+                instructions=build_question_instructions(),
+                input=build_question_input(request),
+                text_format=QuestionOutput,
+                store=False,
+            )
+            if response.output_parsed is None:
+                raise LLMContractError("question generator returned no parsed output")
+            return response.output_parsed
+        except LLMContractError:
+            raise
+        except Exception as error:
+            raise LLMContractError("question provider request failed") from error
