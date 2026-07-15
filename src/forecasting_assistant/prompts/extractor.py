@@ -5,6 +5,7 @@ import re
 from datetime import date, datetime, time
 from enum import Enum
 from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel
 
@@ -59,6 +60,8 @@ def build_extractor_instructions() -> str:
 
 
 def _redact_text(value: str) -> str:
+    if re.fullmatch(r"secret://[A-Za-z0-9._/-]+", value):
+        return value
     value = _URI_USERINFO_PATTERN.sub(r"\1[REDACTED]@", value)
     for pattern in _SECRET_PATTERNS:
         value = pattern.sub("[REDACTED]", value)
@@ -89,6 +92,8 @@ def safe_provider_value(value: Any, *, secret: bool = False) -> Any:
         return safe_provider_value(value.model_dump(mode="python"))
     if isinstance(value, (datetime, date, time)):
         return value.isoformat()
+    if isinstance(value, UUID):
+        return str(value)
     if isinstance(value, str):
         return _redact_text(value)
     if isinstance(value, dict):
