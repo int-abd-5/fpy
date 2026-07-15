@@ -62,6 +62,9 @@ class ElicitationEngine:
             raise DialogueNotFoundError(str(dialogue_id))
         return state
 
+    def get_state(self, dialogue_id: UUID) -> DialogueState:
+        return self._load(dialogue_id).model_copy(deep=True)
+
     def _confirmed_context(self, state: DialogueState) -> dict[str, Any]:
         return {
             slot_id: slot.value
