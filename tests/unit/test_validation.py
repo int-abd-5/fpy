@@ -62,6 +62,12 @@ def test_invalid_timezone_is_a_validation_issue_not_exception() -> None:
     assert issue.code == "iana_timezone"
 
 
+def test_invalid_datetime_text_is_a_validation_issue() -> None:
+    issues = validate_slot(load_schema().get("forecast_start"), _slot("forecast_start", "not-a-date"))
+
+    assert any(issue.code == "invalid_datetime" for issue in issues)
+
+
 def test_cross_field_history_dates_must_be_ordered() -> None:
     schema, state = _dialogue(history_start="2026-02-01T00:00:00Z", history_end="2026-01-01T00:00:00Z")
 
@@ -115,7 +121,7 @@ def test_raw_credentials_are_rejected() -> None:
         "access token abc",
         "password=abc",
         "passwd : abc",
-        "secret abc",
+        "secret: abc",
         "Bearer abc",
         "token=abc",
         "AKIAIOSFODNN7EXAMPLE",
@@ -128,6 +134,12 @@ def test_secret_references_are_not_flagged_as_raw_credentials() -> None:
     issues = validate_slot(
         load_schema().get("authentication_reference"), _slot("authentication_reference", "secret://prod-api-key")
     )
+
+    assert not any(issue.code == "raw_credential" for issue in issues)
+
+
+def test_benign_secret_phrase_is_not_a_raw_credential() -> None:
+    issues = validate_slot(load_schema().get("source_reference"), _slot("source_reference", "secret garden.csv"))
 
     assert not any(issue.code == "raw_credential" for issue in issues)
 

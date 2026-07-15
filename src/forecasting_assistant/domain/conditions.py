@@ -1,7 +1,19 @@
+import re
 from collections.abc import Callable
 
 from forecasting_assistant.domain.models import DialogueState, SlotStatus
 from forecasting_assistant.domain.schema import SlotDefinition
+
+
+_DURATION_UNITS = {
+    "second": "second", "seconds": "second", "secondly": "second",
+    "minute": "minute", "minutes": "minute", "minutely": "minute",
+    "hour": "hour", "hours": "hour", "hourly": "hour",
+    "day": "day", "days": "day", "daily": "day",
+    "week": "week", "weeks": "week", "weekly": "week",
+    "month": "month", "months": "month", "monthly": "month",
+    "year": "year", "years": "year", "yearly": "year",
+}
 
 
 def _value(state: DialogueState, slot_id: str) -> object:
@@ -13,6 +25,12 @@ def _value(state: DialogueState, slot_id: str) -> object:
         "dataset_type", "forecast_type", "calendar_type", "source_mode", "file_format"
     }:
         return value.strip().lower()
+    if slot_id in {"known_seasonality", "contains_sensitive_data"} and isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "yes", "y", "1"}:
+            return True
+        if normalized in {"false", "no", "n", "0"}:
+            return False
     if slot_id == "frequency" and isinstance(value, dict) and value.get("unit") is not None:
         return {**value, "unit": str(value["unit"]).strip().lower()}
     return value
@@ -31,11 +49,25 @@ def _duration_unit(state: DialogueState, slot_id: str) -> str | None:
 
 
 def _same_granularity(state: DialogueState) -> bool:
-    frequency = _value(state, "frequency")
-    output = _value(state, "output_granularity")
-    if isinstance(frequency, dict):
-        frequency = frequency.get("unit")
-    return frequency is not None and output is not None and str(frequency).strip().lower() == str(output).strip().lower()
+    def semantics(value: object) -> tuple[float, str] | None:
+        if isinstance(value, dict):
+            try:
+                periods = float(value["periods"])
+                unit = _DURATION_UNITS[str(value["unit"]).strip().lower()]
+                return periods, unit
+            except (KeyError, TypeError, ValueError):
+                return None
+        if isinstance(value, str):
+            match = re.fullmatch(r"\s*(?:(\d+(?:\.\d+)?)\s*)?([a-zA-Z_]+)\s*", value)
+            if match:
+                periods = float(match.group(1) or 1)
+                unit = _DURATION_UNITS.get(match.group(2).lower())
+                return (periods, unit) if unit else None
+        return None
+
+    return semantics(_value(state, "frequency")) == semantics(_value(state, "output_granularity")) and semantics(
+        _value(state, "frequency")
+    ) is not None
 
 
 def _multi_geography(state: DialogueState) -> bool:

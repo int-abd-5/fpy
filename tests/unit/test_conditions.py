@@ -106,3 +106,21 @@ def test_missing_condition_slots_are_inactive_instead_of_crashing() -> None:
     del state.slots["dataset_type"]
 
     assert not is_slot_active(schema.get("series_id_columns"), state)
+
+
+def test_boolean_like_values_activate_and_deactivate_dependents() -> None:
+    schema, state = _state(known_seasonality="YES", contains_sensitive_data="1")
+    assert is_slot_active(schema.get("seasonal_periods"), state)
+    assert is_slot_active(schema.get("privacy_constraints"), state)
+
+    _, state = _state(known_seasonality="false", contains_sensitive_data="0")
+    assert not is_slot_active(schema.get("seasonal_periods"), state)
+    assert not is_slot_active(schema.get("privacy_constraints"), state)
+
+
+def test_granularity_compares_periods_and_common_aliases() -> None:
+    schema, state = _state(frequency={"periods": 2, "unit": "DAY"}, output_granularity="2 days")
+    assert not is_slot_active(schema.get("aggregation_level"), state)
+
+    state.slots["output_granularity"].value = "daily"
+    assert is_slot_active(schema.get("aggregation_level"), state)

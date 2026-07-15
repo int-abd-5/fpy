@@ -11,8 +11,8 @@ from forecasting_assistant.domain.schema import ForecastingSchema, SlotDefinitio
 
 _CREDENTIAL_PATTERN = re.compile(
     r"(?:sk-[A-Za-z0-9]|AKIA[0-9A-Z]{16}|Bearer\s+|"
-    r"(?:api\s*[_-]?\s*key|access\s*[_-]?\s*token|token|password|passwd|secret)"
-    r"\s*(?:[:=]|\s)\s*[^\s]+)",
+    r"(?:api\s*[_-]?\s*key|access\s*[_-]?\s*token|token|password|passwd)\s*(?:[:=]|\s)\s*[^\s]+|"
+    r"secret\s*[:=]\s*[^\s]+)",
     re.I,
 )
 
@@ -71,6 +71,8 @@ def validate_slot(definition: SlotDefinition, state) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     if value is None:
         return issues
+    if definition.value_type == "datetime" and not isinstance(value, datetime):
+        issues.append(_issue(definition.slot_id, "invalid_datetime", "Value must be a valid datetime."))
     if definition.allowed_values and definition.value_type == "enum" and value not in definition.allowed_values:
         issues.append(_issue(definition.slot_id, "unsupported_value", f"Value must be one of {definition.allowed_values}."))
     if definition.value_type in {"percentage", "percentage_list"}:
