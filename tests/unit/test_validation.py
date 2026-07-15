@@ -159,6 +159,25 @@ def test_credential_assignments_and_authorization_forms_are_rejected() -> None:
         assert any(issue.code == "raw_credential" for issue in issues), value
 
 
+def test_signature_credentials_are_rejected() -> None:
+    definition = load_schema().get("source_reference")
+    for value in (
+        "X-Amz-Signature=abc",
+        "x-amz-signature: abc",
+        "signature=abc",
+    ):
+        issues = validate_slot(definition, _slot("source_reference", value))
+        assert any(issue.code == "raw_credential" for issue in issues), value
+
+
+def test_signature_filename_is_not_a_raw_credential() -> None:
+    definition = load_schema().get("source_reference")
+
+    issues = validate_slot(definition, _slot("source_reference", "signature guide.pdf"))
+
+    assert not any(issue.code == "raw_credential" for issue in issues)
+
+
 def test_mixed_naive_and_aware_history_dates_return_issue() -> None:
     schema, state = _dialogue(
         history_start="2026-01-01T00:00:00",

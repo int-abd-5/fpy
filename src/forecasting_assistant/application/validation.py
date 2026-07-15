@@ -11,7 +11,7 @@ from forecasting_assistant.domain.schema import ForecastingSchema, SlotDefinitio
 
 _CREDENTIAL_PATTERN = re.compile(
     r"(?:sk-[A-Za-z0-9]|AKIA[0-9A-Z]{16}|Bearer\s+|"
-    r"[\"']?(?:api\s*[_-]?\s*key|access\s*[_-]?\s*token|token|password|passwd|secret)[\"']?"
+    r"[\"']?(?:api\s*[_-]?\s*key|access\s*[_-]?\s*token|token|password|passwd|secret|signature)[\"']?"
     r"\s*(?:[:=])\s*[\"']?[^\s,\"'}]+)",
     re.I,
 )
