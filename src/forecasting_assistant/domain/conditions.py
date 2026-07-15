@@ -5,11 +5,22 @@ from forecasting_assistant.domain.schema import SlotDefinition
 
 
 def _value(state: DialogueState, slot_id: str) -> object:
-    return state.slots[slot_id].value
+    slot = state.slots.get(slot_id)
+    if slot is None:
+        return None
+    value = slot.value
+    if isinstance(value, str) and slot_id in {
+        "dataset_type", "forecast_type", "calendar_type", "source_mode", "file_format"
+    }:
+        return value.strip().lower()
+    if slot_id == "frequency" and isinstance(value, dict) and value.get("unit") is not None:
+        return {**value, "unit": str(value["unit"]).strip().lower()}
+    return value
 
 
 def _mentioned(state: DialogueState, slot_id: str) -> bool:
-    return state.slots[slot_id].status != SlotStatus.UNMENTIONED
+    slot = state.slots.get(slot_id)
+    return slot is not None and slot.status != SlotStatus.UNMENTIONED
 
 
 def _duration_unit(state: DialogueState, slot_id: str) -> str | None:
@@ -17,6 +28,19 @@ def _duration_unit(state: DialogueState, slot_id: str) -> str | None:
     if isinstance(value, dict) and value.get("unit") is not None:
         return str(value["unit"]).lower()
     return None
+
+
+def _same_granularity(state: DialogueState) -> bool:
+    frequency = _value(state, "frequency")
+    output = _value(state, "output_granularity")
+    if isinstance(frequency, dict):
+        frequency = frequency.get("unit")
+    return frequency is not None and output is not None and str(frequency).strip().lower() == str(output).strip().lower()
+
+
+def _multi_geography(state: DialogueState) -> bool:
+    geography = _value(state, "geography")
+    return isinstance(geography, list) and len(geography) > 1
 
 
 def _source_reference(state: DialogueState) -> str:
@@ -47,11 +71,11 @@ RULES: dict[str, Callable[[DialogueState], bool]] = {
     "granularity_changes": lambda state: _mentioned(state, "aggregation_method") or (
         _value(state, "output_granularity") is not None
         and _value(state, "frequency") is not None
-        and str(_value(state, "output_granularity")).lower() != str(_value(state, "frequency")).lower()
+        and not _same_granularity(state)
     ),
     "sub_daily_or_multi_timezone": lambda state: _duration_unit(state, "frequency")
     in {"second", "minute", "hour"}
-    or len(_value(state, "geography") or []) > 1,
+    or _multi_geography(state),
     "non_calendar_schedule": lambda state: _value(state, "calendar_type")
     in {"business_day", "trading", "academic", "custom"},
     "explicit_or_delayed_start": lambda state: _mentioned(state, "data_cutoff")
@@ -60,7 +84,12 @@ RULES: dict[str, Callable[[DialogueState], bool]] = {
     "panel_or_hierarchical": lambda state: _value(state, "dataset_type") in {"panel", "hierarchical"},
     "hierarchical": lambda state: _value(state, "dataset_type") == "hierarchical",
     "granularity_changes_or_hierarchy": lambda state: _value(state, "dataset_type") == "hierarchical"
-    or _mentioned(state, "aggregation_method"),
+    or _mentioned(state, "aggregation_method")
+    or (
+        _value(state, "output_granularity") is not None
+        and _value(state, "frequency") is not None
+        and not _same_granularity(state)
+    ),
     "external_provider": lambda state: _value(state, "source_mode") in {"api", "catalog"},
     "probabilistic_output": lambda state: _value(state, "forecast_type") in {"probabilistic", "both"},
     "quantile_output_required": lambda state: _mentioned(state, "quantiles"),

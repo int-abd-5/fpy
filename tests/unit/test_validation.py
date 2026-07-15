@@ -107,9 +107,86 @@ def test_authentication_reference_requires_secret_scheme() -> None:
 
 
 def test_raw_credentials_are_rejected() -> None:
-    for value in ("sk-test", "api_key=abc", "password=abc", "Bearer abc", "token=abc"):
+    for value in (
+        "sk-test",
+        "api_key=abc",
+        "api key: abc",
+        "access-token = abc",
+        "access token abc",
+        "password=abc",
+        "passwd : abc",
+        "secret abc",
+        "Bearer abc",
+        "token=abc",
+        "AKIAIOSFODNN7EXAMPLE",
+    ):
         issues = validate_slot(load_schema().get("source_reference"), _slot("source_reference", value))
         assert any(issue.code == "raw_credential" for issue in issues), value
+
+
+def test_secret_references_are_not_flagged_as_raw_credentials() -> None:
+    issues = validate_slot(
+        load_schema().get("authentication_reference"), _slot("authentication_reference", "secret://prod-api-key")
+    )
+
+    assert not any(issue.code == "raw_credential" for issue in issues)
+
+
+def test_mixed_naive_and_aware_history_dates_return_issue() -> None:
+    schema, state = _dialogue(
+        history_start="2026-01-01T00:00:00",
+        history_end="2026-01-02T00:00:00Z",
+    )
+
+    issues = validate_dialogue(schema, state)
+
+    assert any(issue.code == "datetime_timezone" for issue in issues)
+
+
+def test_mixed_naive_and_aware_forecast_dates_return_issue() -> None:
+    schema, state = _dialogue(
+        forecast_start="2026-01-02T00:00:00",
+        data_cutoff="2026-01-01T00:00:00Z",
+    )
+
+    issues = validate_dialogue(schema, state)
+
+    assert any(issue.code == "datetime_timezone" for issue in issues)
+
+
+def test_missing_slot_entries_do_not_crash_dialogue_validation() -> None:
+    schema, state = _dialogue(dataset_type="Panel", forecast_type="Probabilistic")
+    del state.slots["series_id_columns"]
+    del state.slots["prediction_interval_levels"]
+
+    issues = validate_dialogue(schema, state)
+
+    assert any(issue.code == "series_id_columns_required" for issue in issues)
+
+
+def test_malformed_geography_is_reported_as_a_slot_issue() -> None:
+    schema, state = _dialogue(geography={"country": "PK"})
+
+    issues = validate_dialogue(schema, state)
+
+    assert any(issue.slot_id == "geography" and issue.code == "list_type" for issue in issues)
+
+
+def test_duration_rejects_non_finite_periods() -> None:
+    definition = load_schema().get("forecast_horizon")
+
+    for periods in (float("nan"), float("inf"), float("-inf")):
+        issues = validate_slot(definition, _slot("forecast_horizon", {"periods": periods, "unit": "day"}))
+        assert any(issue.code == "positive_duration" for issue in issues), periods
+
+
+def test_case_normalization_applies_to_cross_field_requirements() -> None:
+    schema, state = _dialogue(dataset_type="Panel", forecast_type="Probabilistic")
+
+    issues = validate_dialogue(schema, state)
+
+    assert any(issue.code == "series_id_columns_required" for issue in issues)
+    assert any(issue.code == "probabilistic_output_required" for issue in issues)
 
 
 def test_probability_values_must_be_between_zero_and_one() -> None:

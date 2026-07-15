@@ -68,3 +68,41 @@ def test_unknown_activation_rule_is_rejected() -> None:
         assert "bogus" in str(error)
     else:
         raise AssertionError("unknown activation rule should fail closed")
+
+
+def test_activation_normalizes_case_sensitive_enum_values() -> None:
+    schema, state = _state(dataset_type="Panel", forecast_type="Probabilistic")
+
+    assert is_slot_active(schema.get("series_id_columns"), state)
+    assert is_slot_active(schema.get("prediction_interval_levels"), state)
+
+
+def test_granularity_difference_activates_aggregation_level_without_aggregation_method() -> None:
+    schema, state = _state(
+        frequency={"periods": 1, "unit": "DAY"},
+        output_granularity="WEEK",
+    )
+
+    assert is_slot_active(schema.get("aggregation_level"), state)
+
+
+def test_granularity_rules_deactivate_when_frequency_and_output_match() -> None:
+    schema, state = _state(
+        frequency={"periods": 1, "unit": "DAY"},
+        output_granularity="day",
+    )
+
+    assert not is_slot_active(schema.get("aggregation_level"), state)
+
+
+def test_malformed_geography_does_not_activate_multi_timezone_rule() -> None:
+    schema, state = _state(frequency={"periods": 1, "unit": "day"}, geography="PK,US")
+
+    assert not is_slot_active(schema.get("timezone"), state)
+
+
+def test_missing_condition_slots_are_inactive_instead_of_crashing() -> None:
+    schema, state = _state()
+    del state.slots["dataset_type"]
+
+    assert not is_slot_active(schema.get("series_id_columns"), state)

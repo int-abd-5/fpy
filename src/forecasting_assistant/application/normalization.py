@@ -15,6 +15,8 @@ def normalize_value(definition: SlotDefinition, value: Any) -> Any:
     value_type = definition.value_type
     if value is None:
         return None
+    if value_type in {"percentage_list", "probability_list", "integer_list", "enum_list", "string_list", "privacy_constraints"} and isinstance(value, dict):
+        return value
     if value_type in {"enum", "timezone"}:
         return str(value).strip().lower() if value_type == "enum" else str(value).strip()
     if value_type == "boolean":
@@ -51,7 +53,7 @@ def normalize_value(definition: SlotDefinition, value: Any) -> Any:
     if value_type == "duration" and isinstance(value, dict):
         result = dict(value)
         try:
-            result["periods"] = int(result["periods"])
+            result["periods"] = float(result["periods"])
         except (KeyError, TypeError, ValueError):
             pass
         if "unit" in result:
