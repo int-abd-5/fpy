@@ -14,7 +14,7 @@ from forecasting_assistant.domain.models import (
     SlotStatus,
     SlotUpdate,
 )
-from forecasting_assistant.domain.schema import create_initial_state, load_schema
+from forecasting_assistant.domain.schema import ForecastingSchema, create_initial_state, load_schema
 
 
 def _result(
@@ -90,12 +90,48 @@ def test_same_confirmed_value_preserves_confirmation_and_status() -> None:
     assert updated.slots["frequency"].confirmed_by_user
 
 
+def test_extractor_confirmed_status_is_downgraded_without_user_confirmation() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+
+    updated = apply_extraction(
+        state,
+        _result("forecast_type", "point", status=SlotStatus.CONFIRMED),
+        schema,
+        1,
+        "point",
+    )
+
+    assert updated.slots["forecast_type"].status == SlotStatus.PROVIDED
+    assert not updated.slots["forecast_type"].confirmed_by_user
+
+
 def test_unknown_slot_update_is_rejected() -> None:
     schema = load_schema()
     state = create_initial_state(schema)
 
     with pytest.raises(UnknownSlotError):
         apply_extraction(state, _result("made_up_slot", "x"), schema, 1, "x")
+
+
+def test_state_slot_not_registered_in_schema_is_rejected_as_unknown() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    state.slots["forged_slot"] = SlotState(slot_id="forged_slot")
+
+    with pytest.raises(UnknownSlotError):
+        apply_extraction(state, _result("forged_slot", "x"), schema, 1, "x")
+
+
+def test_schema_slot_missing_from_state_is_rejected_as_unknown() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    drifted_schema = ForecastingSchema(
+        slots=tuple(slot for slot in schema.slots if slot.slot_id != "frequency")
+    )
+
+    with pytest.raises(UnknownSlotError):
+        apply_extraction(state, _result("frequency", "daily"), drifted_schema, 1, "daily")
 
 
 def test_invalid_value_is_recorded_without_becoming_confirmed() -> None:
@@ -215,6 +251,21 @@ def test_input_state_is_deeply_unchanged() -> None:
     assert state == before
     assert updated is not state
     assert updated.slots is not state.slots
+
+
+def test_mutating_extractor_nested_candidate_does_not_mutate_returned_state() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    candidate = [{"field": "region", "values": ["PK", {"code": "ISB"}]}]
+    result = _result("scope_filters", candidate, evidence="region")
+
+    updated = apply_extraction(state, result, schema, 1, "region")
+    candidate[0]["values"].append("US")
+    candidate[0]["values"][1]["code"] = "LHR"
+
+    assert updated.slots["scope_filters"].value == [
+        {"field": "region", "values": ["PK", {"code": "ISB"}]}
+    ]
 
 
 def test_evidence_must_be_from_current_message_only_and_failure_is_atomic() -> None:

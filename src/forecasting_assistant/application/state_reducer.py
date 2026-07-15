@@ -20,10 +20,16 @@ class UnsupportedEvidenceError(ValueError):
         self.evidence_text = evidence_text
 
 
-def _check_contract(state: DialogueState, result: ExtractorResult, current_message: str) -> None:
+def _check_contract(
+    state: DialogueState,
+    result: ExtractorResult,
+    schema: ForecastingSchema,
+    current_message: str,
+) -> None:
     message = current_message.casefold()
+    schema_slot_ids = {slot.slot_id for slot in schema.slots}
     for update in result.updates:
-        if update.slot_id not in state.slots:
+        if update.slot_id not in state.slots or update.slot_id not in schema_slot_ids:
             raise UnknownSlotError(update.slot_id)
         if not update.evidence_text.strip() or update.evidence_text.casefold() not in message:
             raise UnsupportedEvidenceError(update.evidence_text)
@@ -38,7 +44,7 @@ def _apply_update(
 ) -> None:
     current = state.slots[update.slot_id]
     definition = schema.get(update.slot_id)
-    normalized = normalize_value(definition, update.candidate_value)
+    normalized = deepcopy(normalize_value(definition, update.candidate_value))
 
     if current.confirmed_by_user and current.value != normalized and not result.correction_detected:
         current.status = SlotStatus.CONFLICTING
@@ -55,7 +61,7 @@ def _apply_update(
         return
 
     current.value = normalized
-    current.status = update.status
+    current.status = SlotStatus.PROVIDED if update.status == SlotStatus.CONFIRMED else update.status
     current.confidence = update.confidence
     current.evidence_text = update.evidence_text
     current.source_turn = turn_number
@@ -72,7 +78,7 @@ def apply_extraction(
     turn_number: int,
     current_message: str,
 ) -> DialogueState:
-    _check_contract(state, result, current_message)
+    _check_contract(state, result, schema, current_message)
     updated_state = deepcopy(state)
     updated_state.intent = result.intent
     for update in result.updates:
