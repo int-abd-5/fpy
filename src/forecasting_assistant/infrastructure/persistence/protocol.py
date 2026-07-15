@@ -20,4 +20,3 @@ class DialogueRepository(Protocol):
 
     def save_specification(self, specification: ForecastingSpecification) -> None:
         raise NotImplementedError
-

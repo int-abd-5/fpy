@@ -1,2 +1,1 @@
 """Deterministic FYP evaluation assets."""
-

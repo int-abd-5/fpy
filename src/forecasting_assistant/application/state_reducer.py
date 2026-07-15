@@ -4,7 +4,12 @@ from copy import deepcopy
 
 from forecasting_assistant.application.normalization import normalize_value
 from forecasting_assistant.application.validation import validate_slot
-from forecasting_assistant.domain.models import DialogueState, ExtractorResult, SlotStatus
+from forecasting_assistant.domain.models import (
+    DialogueState,
+    ExtractorResult,
+    SlotStatus,
+    SlotUpdate,
+)
 from forecasting_assistant.domain.schema import ForecastingSchema
 
 
@@ -38,7 +43,7 @@ def _check_contract(
 def _apply_update(
     state: DialogueState,
     result: ExtractorResult,
-    update,
+    update: SlotUpdate,
     schema: ForecastingSchema,
     turn_number: int,
 ) -> None:

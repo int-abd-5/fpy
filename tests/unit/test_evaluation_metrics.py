@@ -54,4 +54,3 @@ def test_empty_denominators_are_safe() -> None:
 
     assert set(metrics) == METRIC_KEYS
     assert all(isinstance(value, float) for value in metrics.values())
-

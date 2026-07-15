@@ -85,4 +85,3 @@ def test_show_and_quit_do_not_call_provider(monkeypatch) -> None:
     assert result.exit_code == 0
     assert str(engine.state.dialogue_id) in result.output
     assert engine.messages == []
-

@@ -146,4 +146,3 @@ class SQLiteDialogueRepository:
         if row is None:
             return None
         return ForecastingSpecification.model_validate_json(row["specification_json"])
-

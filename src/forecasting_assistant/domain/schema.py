@@ -62,7 +62,7 @@ def _slot(
 def _build_slots() -> tuple[SlotDefinition, ...]:
     R = Requiredness.REQUIRED
     C = Requiredness.CONDITIONAL
-    O = Requiredness.OPTIONAL
+    O = Requiredness.OPTIONAL  # noqa: E741
     D = Requiredness.DEFAULTABLE
 
     return (

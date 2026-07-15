@@ -58,6 +58,7 @@ def _duration_unit(state: DialogueState, slot_id: str) -> str | None:
 
 
 def _duration_semantics(value: object) -> tuple[float, str] | None:
+    unit: str | None
     if isinstance(value, dict):
         try:
             periods = float(value["periods"])
@@ -73,6 +74,8 @@ def _duration_semantics(value: object) -> tuple[float, str] | None:
         if unit is None:
             return None
     else:
+        return None
+    if unit is None:
         return None
     if unit in _FIXED_DURATION_SECONDS:
         return periods * _FIXED_DURATION_SECONDS[unit], "fixed"

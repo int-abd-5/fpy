@@ -130,8 +130,8 @@ def build_extractor_input(
         for definition in schema.slots
         if is_slot_active(definition, state)
     ]
-    confirmed_slots = []
-    unconfirmed_slots = []
+    confirmed_slots: list[dict[str, Any]] = []
+    unconfirmed_slots: list[dict[str, Any]] = []
     active_slot_ids = {item["slot_id"] for item in active_definitions}
     for slot in state.slots.values():
         if slot.status == SlotStatus.UNMENTIONED or slot.slot_id not in active_slot_ids:

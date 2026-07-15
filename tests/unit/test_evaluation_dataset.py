@@ -30,4 +30,3 @@ def test_committed_jsonl_is_stable_and_matches_builder() -> None:
     assert [row["scenario_id"] for row in rows] == sorted(
         row["scenario_id"] for row in rows
     )
-

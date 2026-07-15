@@ -5,7 +5,7 @@ from typing import Any
 
 from forecasting_assistant.application.normalization import is_iana_timezone, normalize_value
 from forecasting_assistant.domain.conditions import is_slot_active
-from forecasting_assistant.domain.models import DialogueState, ValidationIssue
+from forecasting_assistant.domain.models import DialogueState, SlotState, ValidationIssue
 from forecasting_assistant.domain.schema import ForecastingSchema, SlotDefinition
 
 
@@ -66,7 +66,14 @@ def _datetime_order_issue(
     return None
 
 
-def validate_slot(definition: SlotDefinition, state) -> list[ValidationIssue]:
+def _outside_range(value: Any, minimum: float, maximum: float) -> bool:
+    number = _number(value)
+    return number is None or not minimum <= number <= maximum
+
+
+def validate_slot(
+    definition: SlotDefinition, state: SlotState
+) -> list[ValidationIssue]:
     value = normalize_value(definition, state.value)
     issues: list[ValidationIssue] = []
     if value is None:
@@ -77,10 +84,10 @@ def validate_slot(definition: SlotDefinition, state) -> list[ValidationIssue]:
         issues.append(_issue(definition.slot_id, "unsupported_value", f"Value must be one of {definition.allowed_values}."))
     if definition.value_type in {"percentage", "percentage_list"}:
         values = value if isinstance(value, list) else [value]
-        if any(_number(item) is None or not 0 <= _number(item) <= 100 for item in values):
+        if any(_outside_range(item, 0, 100) for item in values):
             issues.append(_issue(definition.slot_id, "percentage_range", "Percentage must be between 0 and 100."))
     if definition.value_type == "probability_list":
-        if any(_number(item) is None or not 0 <= _number(item) <= 1 for item in value):
+        if any(_outside_range(item, 0, 1) for item in value):
             issues.append(_issue(definition.slot_id, "probability_range", "Probability must be between 0 and 1."))
     if definition.value_type in {"string_list", "integer_list", "percentage_list", "probability_list", "enum_list"} and not isinstance(value, list):
         issues.append(_issue(definition.slot_id, "list_type", "Value must be a list."))

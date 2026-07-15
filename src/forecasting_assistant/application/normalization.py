@@ -33,32 +33,32 @@ def normalize_value(definition: SlotDefinition, value: Any) -> Any:
         except (TypeError, ValueError):
             return value
     if value_type in {"percentage_list", "probability_list"}:
-        result = []
+        numeric_items: list[Any] = []
         for item in _items(value):
             try:
-                result.append(float(item))
+                numeric_items.append(float(item))
             except (TypeError, ValueError):
-                result.append(item)
-        return result
+                numeric_items.append(item)
+        return numeric_items
     if value_type in {"integer_list", "enum_list"}:
-        result = []
+        normalized_items: list[Any] = []
         for item in _items(value):
             try:
-                result.append(int(item)) if value_type == "integer_list" else result.append(str(item).strip().lower())
+                normalized_items.append(int(item)) if value_type == "integer_list" else normalized_items.append(str(item).strip().lower())
             except (TypeError, ValueError):
-                result.append(item)
-        return result
+                normalized_items.append(item)
+        return normalized_items
     if value_type in {"string_list", "privacy_constraints"}:
         return [str(item).strip() for item in _items(value)]
     if value_type == "duration" and isinstance(value, dict):
-        result = dict(value)
+        duration = dict(value)
         try:
-            result["periods"] = float(result["periods"])
+            duration["periods"] = float(duration["periods"])
         except (KeyError, TypeError, ValueError):
             pass
-        if "unit" in result:
-            result["unit"] = str(result["unit"]).strip().lower()
-        return result
+        if "unit" in duration:
+            duration["unit"] = str(duration["unit"]).strip().lower()
+        return duration
     if value_type == "datetime" and isinstance(value, str):
         try:
             return datetime.fromisoformat(value.replace("Z", "+00:00"))
