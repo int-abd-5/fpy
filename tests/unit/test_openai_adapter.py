@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import pytest
+from openai.lib._pydantic import to_strict_json_schema
 
 from forecasting_assistant.domain.models import (
     ExtractorResult,
@@ -50,6 +51,13 @@ def _question_request() -> QuestionRequest:
         confirmed_context={"target_description": "sales"},
         static_question="How often are sales observed?",
     )
+
+
+def test_extractor_candidate_value_has_a_typed_strict_schema() -> None:
+    schema = to_strict_json_schema(ExtractorResult)
+    candidate_schema = schema["$defs"]["SlotUpdate"]["properties"]["candidate_value"]
+
+    assert "type" in candidate_schema
 
 
 @pytest.mark.asyncio

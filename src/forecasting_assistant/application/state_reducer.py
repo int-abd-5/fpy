@@ -7,6 +7,7 @@ from forecasting_assistant.application.validation import validate_slot
 from forecasting_assistant.domain.models import (
     DialogueState,
     ExtractorResult,
+    Intent,
     SlotStatus,
     SlotUpdate,
 )
@@ -74,6 +75,12 @@ def _apply_update(
     current.validation_errors = [issue.message for issue in validate_slot(definition, current)]
     if current.validation_errors:
         current.status = SlotStatus.INVALID
+    elif (
+        definition.value_type == "duration"
+        and isinstance(normalized, dict)
+        and update.status == SlotStatus.AMBIGUOUS
+    ):
+        current.status = SlotStatus.PROVIDED
 
 
 def apply_extraction(
@@ -88,4 +95,20 @@ def apply_extraction(
     updated_state.intent = result.intent
     for update in result.updates:
         _apply_update(updated_state, result, update, schema, turn_number)
+    if result.intent == Intent.CREATE_FORECAST:
+        intent_slot = updated_state.slots["intent"]
+        intent_update = next(
+            (update for update in result.updates if update.slot_id == "intent"),
+            None,
+        )
+        intent_slot.value = Intent.CREATE_FORECAST.value
+        intent_slot.status = (
+            SlotStatus.CONFIRMED if intent_slot.confirmed_by_user else SlotStatus.PROVIDED
+        )
+        intent_slot.confidence = result.intent_confidence
+        intent_slot.evidence_text = (
+            intent_update.evidence_text if intent_update is not None else current_message
+        )
+        intent_slot.source_turn = turn_number
+        intent_slot.validation_errors = []
     return updated_state

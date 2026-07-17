@@ -18,3 +18,15 @@ def test_update_rejects_unknown_confidence_range() -> None:
             confidence=1.2,
             evidence_text="daily sales",
         )
+
+
+def test_update_decodes_json_encoded_candidate_value() -> None:
+    update = SlotUpdate(
+        slot_id="forecast_horizon",
+        candidate_value='{"periods": 12, "unit": "months"}',
+        status=SlotStatus.PROVIDED,
+        confidence=0.95,
+        evidence_text="next 12 months",
+    )
+
+    assert update.candidate_value == {"periods": 12, "unit": "months"}

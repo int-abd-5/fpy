@@ -1,11 +1,28 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, WithJsonSchema, model_validator
+
+
+def _decode_candidate_value(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return value
+
+
+CandidateValue = Annotated[
+    Any,
+    BeforeValidator(_decode_candidate_value),
+    WithJsonSchema({"type": "string"}),
+]
 
 
 class SlotStatus(StrEnum):
@@ -53,7 +70,7 @@ class SlotState(BaseModel):
 
 class SlotUpdate(BaseModel):
     slot_id: str
-    candidate_value: Any = None
+    candidate_value: CandidateValue = None
     status: SlotStatus
     confidence: float = Field(ge=0, le=1)
     evidence_text: str

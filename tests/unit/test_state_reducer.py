@@ -47,7 +47,7 @@ def _state_with_confirmed_frequency() -> tuple[object, object]:
     state = create_initial_state(schema)
     state.slots["frequency"] = SlotState(
         slot_id="frequency",
-        value="daily",
+        value={"periods": 1.0, "unit": "day"},
         status=SlotStatus.CONFIRMED,
         confidence=1.0,
         evidence_text="daily",
@@ -61,7 +61,7 @@ def test_confirmed_value_is_not_overwritten_without_correction_intent() -> None:
     schema, state = _state_with_confirmed_frequency()
     updated = apply_extraction(state, _result("frequency", "weekly"), schema, 2, "weekly")
 
-    assert updated.slots["frequency"].value == "daily"
+    assert updated.slots["frequency"].value == {"periods": 1.0, "unit": "day"}
     assert updated.slots["frequency"].status == SlotStatus.CONFLICTING
 
 
@@ -75,8 +75,8 @@ def test_explicit_correction_replaces_value_and_clears_confirmation() -> None:
         "weekly",
     )
 
-    assert updated.slots["frequency"].value == "weekly"
-    assert updated.slots["frequency"].status == SlotStatus.INVALID
+    assert updated.slots["frequency"].value == {"periods": 1.0, "unit": "week"}
+    assert updated.slots["frequency"].status == SlotStatus.PROVIDED
     assert not updated.slots["frequency"].confirmed_by_user
 
 
@@ -85,7 +85,7 @@ def test_same_confirmed_value_preserves_confirmation_and_status() -> None:
 
     updated = apply_extraction(state, _result("frequency", "daily"), schema, 2, "daily")
 
-    assert updated.slots["frequency"].value == "daily"
+    assert updated.slots["frequency"].value == {"periods": 1.0, "unit": "day"}
     assert updated.slots["frequency"].status == SlotStatus.CONFIRMED
     assert updated.slots["frequency"].confirmed_by_user
 
@@ -199,6 +199,46 @@ def test_repeated_unconfirmed_updates_replace_value() -> None:
     assert second.slots["frequency"].source_turn == 2
 
 
+def test_natural_language_duration_update_is_valid() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+
+    updated = apply_extraction(
+        state,
+        _result(
+            "forecast_horizon",
+            "10 days",
+            evidence="10 days",
+            status=SlotStatus.AMBIGUOUS,
+        ),
+        schema,
+        1,
+        "10 days",
+    )
+
+    assert updated.slots["forecast_horizon"].value == {"periods": 10.0, "unit": "day"}
+    assert updated.slots["forecast_horizon"].status == SlotStatus.PROVIDED
+    assert updated.slots["forecast_horizon"].validation_errors == []
+
+
+def test_top_level_forecast_intent_populates_required_intent_slot() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    result = ExtractorResult(
+        intent=Intent.CREATE_FORECAST,
+        intent_confidence=0.97,
+        updates=[],
+    )
+
+    updated = apply_extraction(state, result, schema, 1, "Forecast bitcoin prices")
+
+    assert updated.intent == Intent.CREATE_FORECAST
+    assert updated.slots["intent"].value == "create_forecast"
+    assert updated.slots["intent"].status == SlotStatus.PROVIDED
+    assert updated.slots["intent"].confidence == 0.97
+    assert updated.slots["intent"].evidence_text == "Forecast bitcoin prices"
+
+
 def test_valid_update_preserves_existing_validation_errors_only_when_conflicting() -> None:
     schema = load_schema()
     state = create_initial_state(schema)
@@ -237,7 +277,7 @@ def test_multiple_updates_are_applied_in_order() -> None:
 
     updated = apply_extraction(state, result, schema, 3, "daily point forecast")
 
-    assert updated.slots["frequency"].value == "daily"
+    assert updated.slots["frequency"].value == {"periods": 1.0, "unit": "day"}
     assert updated.slots["forecast_type"].value == "point"
 
 

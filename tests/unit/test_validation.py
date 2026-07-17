@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+import pytest
+
 from forecasting_assistant.application.normalization import normalize_value
 from forecasting_assistant.application.validation import validate_dialogue, validate_slot
 from forecasting_assistant.domain.models import SlotState, SlotStatus
@@ -46,6 +48,21 @@ def test_normalization_handles_schema_value_types() -> None:
         "periods": 2,
         "unit": "hour",
     }
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("1 week", {"periods": 1.0, "unit": "week"}),
+        ("10 days", {"periods": 10.0, "unit": "day"}),
+        ("the following week", {"periods": 1.0, "unit": "week"}),
+        ("monthly", {"periods": 1.0, "unit": "month"}),
+    ],
+)
+def test_normalization_converts_natural_language_durations(
+    value: str, expected: dict[str, object]
+) -> None:
+    assert normalize_value(load_schema().get("forecast_horizon"), value) == expected
 
 
 def test_normalization_converts_datetimes_and_iana_timezones() -> None:
