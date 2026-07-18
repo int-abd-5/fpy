@@ -176,6 +176,25 @@ async def test_provider_failure_uses_static_question_without_slot_mutation() -> 
 
 
 @pytest.mark.asyncio
+async def test_selected_enum_answer_recovers_when_extractor_fails() -> None:
+    client = FakeLLMClient(
+        [_complete_result(omit={"source_mode"})],
+        [QuestionOutput(question="Will the data be uploaded, read from an API, read from a database, or selected from a catalog?")],
+    )
+    engine, _, dialogue_id = await _start(client)
+
+    first = await engine.handle_user_message(dialogue_id, MESSAGE)
+    assert first.assistant_message == "Will the data be uploaded, read from an API, read from a database, or selected from a catalog?"
+
+    result = await engine.handle_user_message(dialogue_id, "upload")
+
+    assert result.state.slots["source_mode"].value == "upload"
+    assert result.state.slots["source_mode"].status == SlotStatus.PROVIDED
+    assert result.readiness.ready
+    assert "confirm" in result.assistant_message.lower()
+
+
+@pytest.mark.asyncio
 async def test_unsupported_intent_returns_terminal_scope_message() -> None:
     unsupported = ExtractorResult(intent=Intent.NOT_FORECASTING, intent_confidence=0.99)
     engine, _, dialogue_id = await _start(FakeLLMClient([unsupported]))

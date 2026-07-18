@@ -8,18 +8,21 @@ from forecasting_assistant.application.clarification import (
     evaluate_readiness,
     select_next_slot,
 )
+from forecasting_assistant.application.normalization import normalize_value
 from forecasting_assistant.application.state_reducer import apply_extraction
 from forecasting_assistant.application.validation import validate_dialogue
 from forecasting_assistant.domain.conditions import is_slot_active
 from forecasting_assistant.domain.models import (
     DialogueState,
     DialogueTurn,
+    ExtractorResult,
     ForecastingSpecification,
     Intent,
     QuestionRequest,
     ReadinessReport,
     Requiredness,
     SlotStatus,
+    SlotUpdate,
     TurnResult,
 )
 from forecasting_assistant.domain.schema import ForecastingSchema, create_initial_state
@@ -101,6 +104,49 @@ class ElicitationEngine:
                 return output.question
         return static_fallback_question(request).question
 
+    def _recover_selected_enum_answer(
+        self,
+        state: DialogueState,
+        turn_number: int,
+        message: str,
+    ) -> tuple[DialogueState, str] | None:
+        candidate = select_next_slot(self._schema, state)
+        if candidate is None:
+            return None
+        definition = self._schema.get(candidate.slot_id)
+        if definition.value_type != "enum":
+            return None
+        normalized = normalize_value(definition, message)
+        if normalized not in definition.allowed_values:
+            return None
+
+        intent = state.intent
+        intent_confidence = state.slots["intent"].confidence or 0.0
+        if state.slots["intent"].value == Intent.CREATE_FORECAST.value:
+            intent = Intent.CREATE_FORECAST
+            intent_confidence = max(intent_confidence, 0.99)
+
+        recovered = apply_extraction(
+            state,
+            ExtractorResult(
+                intent=intent,
+                intent_confidence=intent_confidence,
+                updates=[
+                    SlotUpdate(
+                        slot_id=candidate.slot_id,
+                        candidate_value=normalized,
+                        status=SlotStatus.PROVIDED,
+                        confidence=1.0,
+                        evidence_text=message,
+                    )
+                ],
+            ),
+            self._schema,
+            turn_number,
+            message,
+        )
+        return recovered, candidate.slot_id
+
     def _render_confirmation(self, state: DialogueState) -> str:
         values = {
             slot_id: slot.value
@@ -162,20 +208,33 @@ class ElicitationEngine:
                 extraction.model_dump(mode="json"),
             )
         except Exception as error:
-            readiness = evaluate_readiness(self._schema, state)
-            candidate = select_next_slot(self._schema, state)
-            if candidate is None:
-                assistant = "Please describe the forecasting requirement you want to define."
+            recovered = self._recover_selected_enum_answer(state, turn_number, message)
+            if recovered is not None:
+                state, slot_id = recovered
+                self._repository.append_event(
+                    dialogue_id,
+                    "deterministic_recovery_applied",
+                    {
+                        "turn_number": turn_number,
+                        "slot_id": slot_id,
+                        "message": message,
+                    },
+                )
             else:
-                assistant = static_fallback_question(
-                    self._question_request(state, candidate.slot_id, candidate.reason)
-                ).question
-            self._repository.append_event(
-                dialogue_id,
-                "extractor_failed",
-                {"error_type": type(error).__name__},
-            )
-            return self._finish_turn(state, assistant, readiness)
+                readiness = evaluate_readiness(self._schema, state)
+                candidate = select_next_slot(self._schema, state)
+                if candidate is None:
+                    assistant = "Please describe the forecasting requirement you want to define."
+                else:
+                    assistant = static_fallback_question(
+                        self._question_request(state, candidate.slot_id, candidate.reason)
+                    ).question
+                self._repository.append_event(
+                    dialogue_id,
+                    "extractor_failed",
+                    {"error_type": type(error).__name__},
+                )
+                return self._finish_turn(state, assistant, readiness)
 
         if state.intent in {Intent.NOT_FORECASTING, Intent.UNSUPPORTED}:
             readiness = evaluate_readiness(self._schema, state)

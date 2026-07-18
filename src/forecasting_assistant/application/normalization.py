@@ -38,6 +38,42 @@ _DURATION_TEXT_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+_ENUM_ALIASES = {
+    "source_mode": {
+        "csv": "upload",
+        "xlsx": "upload",
+        "excel": "upload",
+        "spreadsheet": "upload",
+        "json_file": "upload",
+        "parquet": "upload",
+        "file": "upload",
+        "upload": "upload",
+        "uploaded": "upload",
+        "api": "api",
+        "rest_api": "api",
+        "endpoint": "api",
+        "database": "database",
+        "db": "database",
+        "sql": "database",
+        "warehouse": "database",
+        "catalog": "catalog",
+        "catalogue": "catalog",
+    },
+    "dataset_type": {
+        "single": "single_series",
+        "single_series": "single_series",
+        "single_time_series": "single_series",
+        "time_series": "single_series",
+        "univariate": "single_series",
+        "one_series": "single_series",
+        "panel": "panel",
+        "multiple_series": "panel",
+        "multi_series": "panel",
+        "hierarchical": "hierarchical",
+        "hierarchy": "hierarchical",
+    },
+}
+
 
 def _items(value: Any) -> list[Any]:
     if isinstance(value, (list, tuple, set)):
@@ -55,6 +91,43 @@ def _duration_from_text(value: str) -> dict[str, Any] | None:
     return {"periods": float(match.group("number") or 1), "unit": unit}
 
 
+def _enum_key(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(value).strip().lower()).strip("_")
+
+
+def _normalize_enum_value(definition: SlotDefinition, value: Any) -> str:
+    normalized = str(value).strip().lower()
+    if not definition.allowed_values:
+        return normalized
+    if normalized in definition.allowed_values:
+        return normalized
+
+    key = _enum_key(value)
+    alias = _ENUM_ALIASES.get(definition.slot_id, {}).get(key)
+    if alias is not None:
+        return alias
+
+    if definition.slot_id == "source_mode":
+        if any(term in key for term in ("upload", "uploaded", "file", "csv", "xlsx", "excel", "spreadsheet", "parquet")):
+            return "upload"
+        if any(term in key for term in ("api", "endpoint", "rest", "webhook", "url")):
+            return "api"
+        if any(term in key for term in ("database", "db", "sql", "warehouse", "postgres", "mysql", "sqlite", "bigquery", "snowflake")):
+            return "database"
+        if any(term in key for term in ("catalog", "catalogue", "registry")):
+            return "catalog"
+
+    if definition.slot_id == "dataset_type":
+        if "hierarch" in key:
+            return "hierarchical"
+        if key in {"single", "univariate"} or ("single" in key and "series" in key):
+            return "single_series"
+        if "panel" in key or "multiple" in key or "multi" in key:
+            return "panel"
+
+    return normalized
+
+
 def normalize_value(definition: SlotDefinition, value: Any) -> Any:
     value_type = definition.value_type
     if value is None:
@@ -62,7 +135,7 @@ def normalize_value(definition: SlotDefinition, value: Any) -> Any:
     if value_type in {"percentage_list", "probability_list", "integer_list", "enum_list", "string_list", "privacy_constraints"} and isinstance(value, dict):
         return value
     if value_type in {"enum", "timezone"}:
-        return str(value).strip().lower() if value_type == "enum" else str(value).strip()
+        return _normalize_enum_value(definition, value) if value_type == "enum" else str(value).strip()
     if value_type == "boolean":
         if isinstance(value, bool):
             return value

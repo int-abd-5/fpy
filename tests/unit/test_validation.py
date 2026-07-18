@@ -40,6 +40,9 @@ def test_horizon_requires_positive_periods() -> None:
 def test_normalization_handles_schema_value_types() -> None:
     schema = load_schema()
     assert normalize_value(schema.get("forecast_type"), " Point ") == "point"
+    assert normalize_value(schema.get("source_mode"), "CSV") == "upload"
+    assert normalize_value(schema.get("source_mode"), "uploaded") == "upload"
+    assert normalize_value(schema.get("dataset_type"), "single_time_series") == "single_series"
     assert normalize_value(schema.get("known_seasonality"), "YES") is True
     assert normalize_value(schema.get("prediction_interval_levels"), [80, "95"]) == [80.0, 95.0]
     assert normalize_value(schema.get("seasonal_periods"), "7, 12") == [7, 12]
