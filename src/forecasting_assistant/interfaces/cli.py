@@ -13,6 +13,7 @@ from forecasting_assistant.infrastructure.llm.openai_responses import OpenAIResp
 from forecasting_assistant.infrastructure.persistence.sqlite_repository import (
     SQLiteDialogueRepository,
 )
+from forecasting_assistant.interfaces.web import run_web_server
 
 
 app = typer.Typer(help="Forecasting requirement elicitation tools.")
@@ -89,3 +90,13 @@ def interview(
         result = asyncio.run(engine.handle_user_message(state.dialogue_id, message))
         state = result.state
         typer.echo(result.assistant_message)
+
+
+@app.command()
+def web(
+    host: str = typer.Option("127.0.0.1", "--host", help="Host for the local web UI."),
+    port: int = typer.Option(8765, "--port", help="Port for the local web UI."),
+    open_browser: bool = typer.Option(True, "--open/--no-open", help="Open the browser automatically."),
+) -> None:
+    """Run the local web demo interface."""
+    run_web_server(host=host, port=port, open_browser=open_browser)

@@ -104,7 +104,7 @@ class ElicitationEngine:
                 return output.question
         return static_fallback_question(request).question
 
-    def _recover_selected_enum_answer(
+    def _recover_selected_slot_answer(
         self,
         state: DialogueState,
         turn_number: int,
@@ -114,10 +114,12 @@ class ElicitationEngine:
         if candidate is None:
             return None
         definition = self._schema.get(candidate.slot_id)
-        if definition.value_type != "enum":
+        if definition.value_type not in {"enum", "boolean"}:
             return None
         normalized = normalize_value(definition, message)
-        if normalized not in definition.allowed_values:
+        if definition.value_type == "enum" and normalized not in definition.allowed_values:
+            return None
+        if definition.value_type == "boolean" and not isinstance(normalized, bool):
             return None
 
         intent = state.intent
@@ -208,7 +210,7 @@ class ElicitationEngine:
                 extraction.model_dump(mode="json"),
             )
         except Exception as error:
-            recovered = self._recover_selected_enum_answer(state, turn_number, message)
+            recovered = self._recover_selected_slot_answer(state, turn_number, message)
             if recovered is not None:
                 state, slot_id = recovered
                 self._repository.append_event(

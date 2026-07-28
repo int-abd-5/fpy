@@ -195,6 +195,29 @@ async def test_selected_enum_answer_recovers_when_extractor_fails() -> None:
 
 
 @pytest.mark.asyncio
+async def test_selected_boolean_answer_recovers_when_extractor_fails() -> None:
+    client = FakeLLMClient(
+        [_complete_result(omit={"contains_sensitive_data"})],
+        [
+            QuestionOutput(
+                question="Does the source contain personal, confidential, or regulated data?"
+            ),
+            QuestionOutput(question="Which privacy or access restrictions apply?"),
+        ],
+    )
+    engine, _, dialogue_id = await _start(client)
+
+    first = await engine.handle_user_message(dialogue_id, MESSAGE)
+    assert first.assistant_message == "Does the source contain personal, confidential, or regulated data?"
+
+    result = await engine.handle_user_message(dialogue_id, "yes")
+
+    assert result.state.slots["contains_sensitive_data"].value is True
+    assert result.state.slots["contains_sensitive_data"].status == SlotStatus.PROVIDED
+    assert result.assistant_message == "Which privacy or access restrictions apply?"
+
+
+@pytest.mark.asyncio
 async def test_unsupported_intent_returns_terminal_scope_message() -> None:
     unsupported = ExtractorResult(intent=Intent.NOT_FORECASTING, intent_confidence=0.99)
     engine, _, dialogue_id = await _start(FakeLLMClient([unsupported]))
