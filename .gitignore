@@ -8,4 +8,5 @@ __pycache__/
 .ruff_cache/
 .env
 elicitation.db
+dataset_store/
 evaluation/results/

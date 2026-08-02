@@ -11,12 +11,22 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
+from forecasting_assistant.application.dataset_discovery import DatasetDiscoveryService
 from forecasting_assistant.application.orchestrator import ElicitationEngine
 from forecasting_assistant.config import get_settings
+from forecasting_assistant.domain.datasets import SourcePlan
 from forecasting_assistant.domain.models import DialogueState, ReadinessReport, TurnResult
 from forecasting_assistant.domain.schema import load_schema
+from forecasting_assistant.infrastructure.datasets.http import SecureHttpClient
+from forecasting_assistant.infrastructure.datasets.object_store import ContentAddressedObjectStore
+from forecasting_assistant.infrastructure.datasets.registry import build_default_adapters
+from forecasting_assistant.infrastructure.datasets.sqlite_repository import (
+    SQLiteDatasetCatalogRepository,
+)
 from forecasting_assistant.infrastructure.llm.openai_responses import OpenAIResponsesClient
-from forecasting_assistant.infrastructure.persistence.sqlite_repository import SQLiteDialogueRepository
+from forecasting_assistant.infrastructure.persistence.sqlite_repository import (
+    SQLiteDialogueRepository,
+)
 
 
 def _json_default(value: Any) -> str:
@@ -45,6 +55,10 @@ def _turn_payload(result: TurnResult) -> dict[str, Any]:
     }
 
 
+def _source_plan_payload(plan: SourcePlan) -> dict[str, Any]:
+    return plan.model_dump(mode="json")
+
+
 def _connect(db_path: Path) -> sqlite3.Connection:
     connection = sqlite3.connect(db_path)
     connection.row_factory = sqlite3.Row
@@ -52,11 +66,18 @@ def _connect(db_path: Path) -> sqlite3.Connection:
 
 
 def _list_table(db_path: Path, table: str, order_by: str) -> list[dict[str, Any]]:
-    if table not in {"dialogues", "events", "specifications"}:
+    if table not in {
+        "dialogues",
+        "events",
+        "specifications",
+        "dataset_source_plans",
+        "dataset_selections",
+        "dataset_versions",
+    }:
         raise ValueError("unsupported table")
     with _connect(db_path) as connection:
         rows = connection.execute(f"SELECT * FROM {table} ORDER BY {order_by} DESC LIMIT 100").fetchall()
-    return [{key: row[key] for key in row.keys()} for row in rows]
+    return [{key: row[key] for key in row} for row in rows]
 
 
 def dashboard_html() -> str:
@@ -117,6 +138,7 @@ def dashboard_html() -> str:
       <div class="tabs">
         <button class="active" onclick="tab('slots')">Slots</button>
         <button onclick="tab('specs')">Saved Specs</button>
+        <button onclick="tab('datasets')">Datasets</button>
         <button onclick="tab('events')">Events</button>
         <button onclick="tab('state')">JSON</button>
       </div>
@@ -172,8 +194,8 @@ async function sendMessage() {
 async function confirmSpec() {
   if (!dialogueId) return;
   const data = await api(`/api/dialogues/${dialogueId}/confirm`, {method:'POST'});
-  panel.innerHTML = `<pre>${esc(JSON.stringify(data.specification, null, 2))}</pre>`;
-  await refreshDatabase();
+  currentTab = 'datasets';
+  panel.innerHTML = `<pre>${esc(JSON.stringify(data, null, 2))}</pre>`;
 }
 async function showState() {
   if (!dialogueId) return;
@@ -191,6 +213,7 @@ function renderPanel() {
   if (currentTab === 'slots') renderSlots();
   if (currentTab === 'state') panel.innerHTML = `<pre>${esc(JSON.stringify(state, null, 2))}</pre>`;
   if (currentTab === 'specs') loadTable('specifications');
+  if (currentTab === 'datasets') loadTable('dataset_source_plans');
   if (currentTab === 'events') loadTable('events');
 }
 function renderSlots() {
@@ -224,8 +247,17 @@ class DashboardServer:
         schema = load_schema(self.settings.schema_version)
         repository = SQLiteDialogueRepository(self.settings.elicitation_db_path)
         repository.initialize()
+        catalog_repository = SQLiteDatasetCatalogRepository(self.settings.elicitation_db_path)
+        catalog_repository.initialize()
         provider = OpenAIResponsesClient(self.settings.openai_api_key, self.settings.openai_model, schema)
         self.engine = ElicitationEngine(schema, provider, repository)
+        http = SecureHttpClient()
+        self.catalog_repository = catalog_repository
+        self.dataset_service = DatasetDiscoveryService(
+            build_default_adapters(http),
+            catalog_repository,
+            ContentAddressedObjectStore(self.settings.dataset_store_path),
+        )
         self.db_path = Path(self.settings.elicitation_db_path)
         self.server = ThreadingHTTPServer((host, port), self._handler_class())
 
@@ -282,9 +314,25 @@ class DashboardServer:
                         self._send_json({"rows": rows})
                     elif parts == ["api", "specifications"]:
                         self._send_json({"rows": _list_table(dashboard.db_path, "specifications", "confirmed_at")})
+                    elif parts == ["api", "dataset-plans"]:
+                        self._send_json(
+                            {
+                                "rows": _list_table(
+                                    dashboard.db_path,
+                                    "dataset_source_plans",
+                                    "created_at",
+                                )
+                            }
+                        )
+                    elif len(parts) == 3 and parts[:2] == ["api", "dataset-plans"]:
+                        plan = dashboard.catalog_repository.load_plan(UUID(parts[2]))
+                        if plan is None:
+                            self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
+                        else:
+                            self._send_json({"source_plan": _source_plan_payload(plan)})
                     else:
                         self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
-                except Exception as error:
+                except Exception as error:  # noqa: BLE001 - HTTP boundary returns safe JSON errors
                     self._error(error)
 
             def do_POST(self) -> None:
@@ -298,11 +346,44 @@ class DashboardServer:
                         result = asyncio.run(dashboard.engine.handle_user_message(UUID(parts[2]), message))
                         self._send_json(_turn_payload(result))
                     elif len(parts) == 4 and parts[:2] == ["api", "dialogues"] and parts[3] == "confirm":
+                        body = self._read_json()
                         specification = dashboard.engine.confirm_specification(UUID(parts[2]), confirm=True)
-                        self._send_json({"specification": specification.model_dump(mode="json")})
+                        user_id = body.get("user_id")
+                        plan = dashboard.dataset_service.discover_for_specification(
+                            specification,
+                            user_id=str(user_id) if user_id else None,
+                        )
+                        self._send_json(
+                            {
+                                "specification": specification.model_dump(mode="json"),
+                                "source_plan": _source_plan_payload(plan),
+                            }
+                        )
+                    elif (
+                        len(parts) == 4
+                        and parts[:2] == ["api", "dataset-plans"]
+                        and parts[3] == "confirm"
+                    ):
+                        body = self._read_json()
+                        candidate_id = str(body.get("candidate_id", "")).strip()
+                        user_id = body.get("user_id")
+                        selection = dashboard.dataset_service.confirm_dataset(
+                            UUID(parts[2]),
+                            candidate_id,
+                            confirm=True,
+                            user_id=str(user_id) if user_id else None,
+                        )
+                        self._send_json({"selection": selection.model_dump(mode="json")})
+                    elif (
+                        len(parts) == 4
+                        and parts[:2] == ["api", "dataset-selections"]
+                        and parts[3] == "fetch"
+                    ):
+                        version = dashboard.dataset_service.fetch_selection(UUID(parts[2]))
+                        self._send_json({"version": version.model_dump(mode="json")})
                     else:
                         self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
-                except Exception as error:
+                except Exception as error:  # noqa: BLE001 - HTTP boundary returns safe JSON errors
                     self._error(error)
 
         return Handler

@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from forecasting_assistant.domain.models import QuestionOutput, QuestionRequest, SlotState
 from forecasting_assistant.prompts.llmrei_long import (
     build_question_input,
@@ -47,9 +49,69 @@ def test_rejects_different_active_slot() -> None:
     assert not validate_question(output, _request())
 
 
-def test_accepts_one_bounded_selected_slot_question() -> None:
-    output = QuestionOutput(question="How often are sales observations recorded?")
-    assert validate_question(output, _request())
+@pytest.mark.parametrize(
+    ("request_changes", "question"),
+    [
+        ({}, "How often are sales observations recorded?"),
+        ({}, "What is the observation cadence for sales?"),
+        (
+            {
+                "slot_id": "forecast_horizon",
+                "slot_description": "How far ahead to forecast.",
+                "current_state": SlotState(slot_id="forecast_horizon"),
+                "static_question": "How far ahead should sales be forecast?",
+                "allowed_values": (),
+                "other_active_slot_ids": ("frequency", "target_column"),
+            },
+            "How far ahead should sales be forecast?",
+        ),
+        (
+            {
+                "slot_id": "target_column",
+                "slot_description": "Column containing the forecast target.",
+                "current_state": SlotState(slot_id="target_column"),
+                "static_question": "Which column contains the sales values?",
+                "allowed_values": (),
+                "other_active_slot_ids": ("frequency", "forecast_horizon"),
+            },
+            "Which column contains the sales values to forecast?",
+        ),
+        (
+            {
+                "slot_id": "source_reference",
+                "slot_description": "Reference to the source data.",
+                "current_state": SlotState(slot_id="source_reference"),
+                "static_question": "Where is the sales history located?",
+                "allowed_values": (),
+                "other_active_slot_ids": ("frequency", "forecast_horizon"),
+            },
+            "Where is the sales history located?",
+        ),
+        (
+            {
+                "slot_id": "prediction_interval_levels",
+                "slot_description": "Requested prediction interval levels.",
+                "current_state": SlotState(slot_id="prediction_interval_levels"),
+                "static_question": "Which prediction interval levels are required?",
+                "allowed_values": (),
+                "other_active_slot_ids": ("frequency", "forecast_horizon"),
+            },
+            "Which prediction interval levels should the sales forecast include?",
+        ),
+    ],
+    ids=(
+        "frequency-natural-wording",
+        "frequency-cadence-wording",
+        "forecast-horizon",
+        "target-column",
+        "source-reference",
+        "prediction-interval-levels",
+    ),
+)
+def test_accepts_valid_bounded_selected_slot_questions(
+    request_changes: dict[str, object], question: str
+) -> None:
+    assert validate_question(QuestionOutput(question=question), _request(**request_changes))
 
 
 def test_static_fallback_uses_schema_wording() -> None:

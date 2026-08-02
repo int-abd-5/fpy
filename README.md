@@ -1,6 +1,6 @@
 # Forecasting Requirement Elicitation
 
-This repository implements the first milestone of an automated time-series forecasting pipeline: turning a free-text request into a validated, explicitly confirmed `ForecastingSpecification`. It stops at the contract boundary for the future data-source planner; it does not fetch data or train forecasting models.
+This repository implements the first two milestones of an automated time-series forecasting pipeline: turning a free-text request into a validated, explicitly confirmed `ForecastingSpecification`, then discovering, ranking, explicitly selecting, and safely caching suitable datasets. It does not train forecasting models.
 
 ## Research Basis
 
@@ -24,7 +24,11 @@ user message
   -> bounded LLMREI-long question or static fallback
   -> explicit confirmation
   -> ForecastingSpecification
-  -> future data-source planner
+  -> production and research dataset catalogs
+  -> deterministic eligibility and ranking
+  -> top-three recommendations
+  -> explicit dataset confirmation
+  -> validated, versioned dataset cache
 ```
 
 The versioned schema contains 79 detailed slots across request, target, time, series, source, history, quality, seasonality, covariates, output, evaluation, operations, and governance areas.
@@ -85,6 +89,18 @@ Commands:
 
 The CLI emits one assistant message per user turn.
 
+After `/confirm`, the CLI prints up to three eligible dataset recommendations. Discovery can also be run separately for a previously confirmed dialogue:
+
+```powershell
+forecast-elicitation discover-datasets DIALOGUE_UUID --user-id USER_SCOPE
+forecast-elicitation confirm-dataset PLAN_UUID CANDIDATE_ID --user-id USER_SCOPE
+forecast-elicitation fetch-dataset SELECTION_UUID
+```
+
+The production catalog includes local uploads, PMD WIS2, World Bank and NASA POWER machine sources plus fail-closed registrations for Pakistani and international official catalogs. NDMA, PDMA, PMD CDPC, publication-only portals, aggregators, and sources with unresolved rights cannot be fetched automatically. AutoForecast and Monash remain in a separate research catalog.
+
+Public, explicitly redistributable payloads use a shared SHA-256 object store. Purchased, private, non-redistributable, and user-uploaded data use hashed per-user namespaces. All selections, versions, checksums, license snapshots, and source plans are persisted in SQLite.
+
 ## Schema and State
 
 Schema version `1.0.0` is loaded through `load_schema()`. Unsupported versions fail closed. Every dialogue stores its schema version, and every slot starts as `unmentioned`.
@@ -140,7 +156,7 @@ The benchmark contains exactly 60 scenarios:
 
 It reports intent accuracy, slot micro precision/recall/F1, average and joint goal accuracy, clarification precision/success, completion rate, average turns, unsupported-value rate, confirmation-correction rate, and one-question compliance for `hybrid`, `schema_no_clarification`, and `unrestricted_llmrei_long` conditions.
 
-## Planner Handoff
+## Forecast Specification and Dataset Handoff
 
 Explicit confirmation emits:
 
@@ -158,4 +174,4 @@ Explicit confirmation emits:
 }
 ```
 
-The future data-source planner should consume this object only after readiness passes and explicit confirmation is recorded. It may use source mode/reference, worksheet or table, schema fields, quality policies, history, covariates, and governance constraints, but must resolve `secret://` references outside dialogue storage.
+The dataset planner consumes this object only after readiness passes and explicit confirmation is recorded. It uses source mode/reference, schema fields, quality policies, history, geography, and governance constraints, but resolves `secret://` references outside dialogue storage. Dataset fetching requires a second explicit confirmation of one eligible recommendation.
