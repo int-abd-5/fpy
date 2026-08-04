@@ -2,12 +2,14 @@ from uuid import UUID
 
 from typer.testing import CliRunner
 
+from forecasting_assistant.config import get_settings
 from forecasting_assistant.domain.models import (
     ForecastingSpecification,
     Intent,
     ReadinessReport,
     TurnResult,
 )
+from forecasting_assistant.infrastructure.persistence.sqlite_repository import SQLiteDialogueRepository
 from forecasting_assistant.domain.schema import create_initial_state, load_schema
 from forecasting_assistant.interfaces import cli
 
@@ -85,3 +87,34 @@ def test_show_and_quit_do_not_call_provider(monkeypatch) -> None:
     assert result.exit_code == 0
     assert str(engine.state.dialogue_id) in result.output
     assert engine.messages == []
+
+
+def test_seed_world_bank_demo_creates_confirmed_trusted_source_spec(tmp_path) -> None:
+    db_path = tmp_path / "demo.db"
+    result = CliRunner().invoke(
+        cli.app,
+        ["seed-world-bank-demo", "--db-path", str(db_path)],
+    )
+
+    assert result.exit_code == 0
+    dialogue_id = UUID(result.output.strip().splitlines()[-1])
+    specification = SQLiteDialogueRepository(db_path).load_specification(dialogue_id)
+
+    assert specification is not None
+    assert specification.values["source_mode"] == "catalog"
+    assert specification.values["source_reference"] == "world-bank:PK:FP.CPI.TOTL.ZG"
+    assert specification.values["target_description"] == "Pakistan annual consumer price inflation"
+
+
+def test_dataset_service_does_not_require_openai_key(monkeypatch, tmp_path) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
+    monkeypatch.setenv("ELICITATION_DB_PATH", str(tmp_path / "demo.db"))
+    monkeypatch.setenv("DATASET_STORE_PATH", str(tmp_path / "dataset_store"))
+    get_settings.cache_clear()
+
+    try:
+        cli.build_dataset_service()
+    finally:
+        get_settings.cache_clear()

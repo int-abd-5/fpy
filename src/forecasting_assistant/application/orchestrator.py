@@ -117,6 +117,8 @@ class ElicitationEngine:
         if definition.value_type not in {"enum", "boolean"}:
             return None
         normalized = normalize_value(definition, message)
+        if candidate.slot_id == "intent" and self._is_affirmative_answer(message):
+            normalized = Intent.CREATE_FORECAST.value
         if definition.value_type == "enum" and normalized not in definition.allowed_values:
             return None
         if definition.value_type == "boolean" and not isinstance(normalized, bool):
@@ -127,6 +129,9 @@ class ElicitationEngine:
         if state.slots["intent"].value == Intent.CREATE_FORECAST.value:
             intent = Intent.CREATE_FORECAST
             intent_confidence = max(intent_confidence, 0.99)
+        if candidate.slot_id == "intent" and normalized == Intent.CREATE_FORECAST.value:
+            intent = Intent.CREATE_FORECAST
+            intent_confidence = 1.0
 
         recovered = apply_extraction(
             state,
@@ -148,6 +153,23 @@ class ElicitationEngine:
             message,
         )
         return recovered, candidate.slot_id
+
+    @staticmethod
+    def _is_affirmative_answer(message: str) -> bool:
+        normalized = message.strip().casefold()
+        return normalized in {
+            "yes",
+            "y",
+            "yeah",
+            "yep",
+            "correct",
+            "confirm",
+            "confirmed",
+            "sure",
+            "ok",
+            "okay",
+            "please do",
+        }
 
     def _render_confirmation(self, state: DialogueState) -> str:
         values = {
@@ -195,20 +217,37 @@ class ElicitationEngine:
 
         try:
             extraction = await self._llm.extract(message, state.model_copy(deep=True))
-            updated = apply_extraction(
-                state,
-                extraction,
-                self._schema,
-                turn_number,
-                message,
-            )
-            updated.intent = extraction.intent
-            state = updated
-            self._repository.append_event(
-                dialogue_id,
-                "extraction_applied",
-                extraction.model_dump(mode="json"),
-            )
+            recovered = self._recover_selected_slot_answer(state, turn_number, message)
+            if recovered is not None and extraction.intent in {
+                Intent.NOT_FORECASTING,
+                Intent.UNSUPPORTED,
+            } | ({Intent.AMBIGUOUS} if recovered[1] == "intent" else set()):
+                state, slot_id = recovered
+                self._repository.append_event(
+                    dialogue_id,
+                    "deterministic_recovery_applied",
+                    {
+                        "turn_number": turn_number,
+                        "slot_id": slot_id,
+                        "message": message,
+                        "reason": "overrode unsupported intent for selected slot answer",
+                    },
+                )
+            else:
+                updated = apply_extraction(
+                    state,
+                    extraction,
+                    self._schema,
+                    turn_number,
+                    message,
+                )
+                updated.intent = extraction.intent
+                state = updated
+                self._repository.append_event(
+                    dialogue_id,
+                    "extraction_applied",
+                    extraction.model_dump(mode="json"),
+                )
         except Exception as error:
             recovered = self._recover_selected_slot_answer(state, turn_number, message)
             if recovered is not None:

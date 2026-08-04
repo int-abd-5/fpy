@@ -10,7 +10,8 @@ from forecasting_assistant.application.dataset_discovery import DatasetDiscovery
 from forecasting_assistant.application.orchestrator import ElicitationEngine
 from forecasting_assistant.config import get_settings
 from forecasting_assistant.domain.datasets import CatalogClass, SourcePlan
-from forecasting_assistant.domain.schema import load_schema
+from forecasting_assistant.domain.models import ForecastingSpecification, Intent
+from forecasting_assistant.domain.schema import create_initial_state, load_schema
 from forecasting_assistant.infrastructure.datasets.http import SecureHttpClient
 from forecasting_assistant.infrastructure.datasets.object_store import ContentAddressedObjectStore
 from forecasting_assistant.infrastructure.datasets.registry import build_default_adapters
@@ -32,6 +33,8 @@ def main() -> None:
 
 def build_engine() -> ElicitationEngine:
     settings = get_settings()
+    if not settings.openai_api_key:
+        raise typer.BadParameter("OPENAI_API_KEY is required for the LLM interview command")
     schema = load_schema(settings.schema_version)
     repository = SQLiteDialogueRepository(settings.elicitation_db_path)
     repository.initialize()
@@ -41,6 +44,32 @@ def build_engine() -> ElicitationEngine:
         schema,
     )
     return ElicitationEngine(schema, provider, repository)
+
+
+def _world_bank_demo_values() -> dict[str, object]:
+    return {
+        "intent": Intent.CREATE_FORECAST.value,
+        "problem_statement": "Forecast Pakistan annual consumer price inflation from trusted public data.",
+        "business_goal": "macroeconomic monitoring",
+        "success_criteria": "low MAE on annual inflation backtests",
+        "target_column": "FP.CPI.TOTL.ZG",
+        "target_description": "Pakistan annual consumer price inflation",
+        "target_unit": "percent",
+        "time_column": "date",
+        "frequency": {"periods": 1, "unit": "year"},
+        "forecast_horizon": {"periods": 3, "unit": "year"},
+        "dataset_type": "single_series",
+        "geography": ["Pakistan"],
+        "source_mode": "catalog",
+        "source_reference": "world-bank:PK:FP.CPI.TOTL.ZG",
+        "source_provider": "World Bank",
+        "forecast_type": "point",
+        "output_granularity": "annual",
+        "primary_metric": "mae",
+        "minimum_training_points": 30,
+        "contains_sensitive_data": False,
+        "license": "CC BY 4.0",
+    }
 
 
 def build_dataset_service() -> tuple[DatasetDiscoveryService, SQLiteDialogueRepository]:
@@ -56,6 +85,41 @@ def build_dataset_service() -> tuple[DatasetDiscoveryService, SQLiteDialogueRepo
         ContentAddressedObjectStore(settings.dataset_store_path),
     )
     return service, dialogue_repository
+
+
+@app.command("seed-world-bank-demo")
+def seed_world_bank_demo(
+    db_path: str = typer.Option(
+        "elicitation.db",
+        "--db-path",
+        help="SQLite database path where the confirmed demo specification is saved.",
+    ),
+    schema_version: str = typer.Option(
+        "1.0.0",
+        "--schema-version",
+        help="Forecasting schema version to stamp on the demo specification.",
+    ),
+) -> None:
+    """Create a confirmed trusted-source demo specification for World Bank inflation data."""
+    schema = load_schema(schema_version)
+    repository = SQLiteDialogueRepository(db_path)
+    repository.initialize()
+    state = create_initial_state(schema)
+    state.intent = Intent.CREATE_FORECAST
+    repository.save_state(state)
+    values = _world_bank_demo_values()
+    specification = ForecastingSpecification(
+        dialogue_id=state.dialogue_id,
+        schema_version=schema_version,
+        values=values,
+        user_provided_slots=list(values),
+        confirmed_inferred_slots=[],
+        documented_defaults={},
+        unresolved_optional_slots=[],
+    )
+    repository.save_specification(specification)
+    typer.echo("Created confirmed trusted-source World Bank demo specification.")
+    typer.echo(str(state.dialogue_id))
 
 
 def _render_source_plan(plan: SourcePlan) -> str:

@@ -218,6 +218,60 @@ async def test_selected_boolean_answer_recovers_when_extractor_fails() -> None:
 
 
 @pytest.mark.asyncio
+async def test_selected_boolean_answer_overrides_bad_not_forecasting_intent() -> None:
+    client = FakeLLMClient(
+        [
+            _complete_result(omit={"contains_sensitive_data"}),
+            ExtractorResult(
+                intent=Intent.NOT_FORECASTING,
+                intent_confidence=0.8,
+                updates=[
+                    _update(
+                        "intent",
+                        "not_forecasting",
+                        evidence="no",
+                    )
+                ],
+            ),
+        ],
+        [QuestionOutput(question="Does the source contain personal, confidential, or regulated data?")],
+    )
+    engine, _, dialogue_id = await _start(client)
+
+    await engine.handle_user_message(dialogue_id, MESSAGE)
+    result = await engine.handle_user_message(dialogue_id, "no")
+
+    assert result.state.intent == Intent.CREATE_FORECAST
+    assert result.state.slots["contains_sensitive_data"].value is False
+    assert result.state.slots["contains_sensitive_data"].status == SlotStatus.PROVIDED
+    assert "supports time-series forecasting requirements only" not in result.assistant_message
+
+
+@pytest.mark.asyncio
+async def test_selected_intent_question_accepts_yes_confirmation() -> None:
+    initial_result = _complete_result(omit={"intent"})
+    initial_result.intent = Intent.AMBIGUOUS
+    initial_result.intent_confidence = 0.4
+    client = FakeLLMClient(
+        [
+            initial_result,
+            ExtractorResult(intent=Intent.AMBIGUOUS, intent_confidence=0.4),
+        ],
+        [QuestionOutput(question="Do you want the system to create a time-series forecast?")],
+    )
+    engine, _, dialogue_id = await _start(client)
+
+    first = await engine.handle_user_message(dialogue_id, MESSAGE)
+    second = await engine.handle_user_message(dialogue_id, "yes")
+
+    assert first.assistant_message == "Do you want the system to create a time-series forecast?"
+    assert second.state.intent == Intent.CREATE_FORECAST
+    assert second.state.slots["intent"].value == Intent.CREATE_FORECAST.value
+    assert second.state.slots["intent"].status == SlotStatus.PROVIDED
+    assert second.assistant_message != "Do you want the system to create a time-series forecast?"
+
+
+@pytest.mark.asyncio
 async def test_unsupported_intent_returns_terminal_scope_message() -> None:
     unsupported = ExtractorResult(intent=Intent.NOT_FORECASTING, intent_confidence=0.99)
     engine, _, dialogue_id = await _start(FakeLLMClient([unsupported]))
