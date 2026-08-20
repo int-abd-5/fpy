@@ -120,9 +120,11 @@ class QuestionRequest(BaseModel):
     slot_description: str
     current_state: SlotState
     confirmed_context: dict[str, Any]
+    known_context: dict[str, Any] = Field(default_factory=dict)
     static_question: str
     allowed_values: tuple[str, ...] = ()
     other_active_slot_ids: tuple[str, ...] = ()
+    example_answer: str | None = None
 
 
 class QuestionOutput(BaseModel):

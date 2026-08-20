@@ -6,6 +6,7 @@ from forecasting_assistant.domain.models import QuestionOutput, QuestionRequest,
 from forecasting_assistant.prompts.llmrei_long import (
     build_question_input,
     build_question_instructions,
+    example_answer,
     static_fallback_question,
     validate_question,
 )
@@ -41,19 +42,22 @@ def test_rejects_question_that_suggests_unconfirmed_value() -> None:
 
 def test_allows_candidate_already_present_in_confirmed_context() -> None:
     request = _request(confirmed_context={"frequency": "weekly", "target": "sales"})
-    assert validate_question(QuestionOutput(question="Is weekly still the frequency?"), request)
+    assert validate_question(
+        QuestionOutput(question="Is weekly still the frequency? Example answer: weekly."),
+        request,
+    )
 
 
 def test_rejects_different_active_slot() -> None:
-    output = QuestionOutput(question="What is the forecast horizon?")
+    output = QuestionOutput(question="What is the forecast horizon? Example answer: 7 days.")
     assert not validate_question(output, _request())
 
 
 @pytest.mark.parametrize(
     ("request_changes", "question"),
     [
-        ({}, "How often are sales observations recorded?"),
-        ({}, "What is the observation cadence for sales?"),
+        ({}, "How often are sales observations recorded? Example answer: daily."),
+        ({}, "What is the observation cadence for sales? Example answer: daily."),
         (
             {
                 "slot_id": "forecast_horizon",
@@ -63,7 +67,7 @@ def test_rejects_different_active_slot() -> None:
                 "allowed_values": (),
                 "other_active_slot_ids": ("frequency", "target_column"),
             },
-            "How far ahead should sales be forecast?",
+            "How far ahead should sales be forecast? Example answer: 7 days.",
         ),
         (
             {
@@ -74,7 +78,7 @@ def test_rejects_different_active_slot() -> None:
                 "allowed_values": (),
                 "other_active_slot_ids": ("frequency", "forecast_horizon"),
             },
-            "Which column contains the sales values to forecast?",
+            "Which column contains the sales values to forecast? Example answer: revenue.",
         ),
         (
             {
@@ -85,7 +89,7 @@ def test_rejects_different_active_slot() -> None:
                 "allowed_values": (),
                 "other_active_slot_ids": ("frequency", "forecast_horizon"),
             },
-            "Where is the sales history located?",
+            "Where is the sales history located? Example answer: sales.csv.",
         ),
         (
             {
@@ -96,7 +100,7 @@ def test_rejects_different_active_slot() -> None:
                 "allowed_values": (),
                 "other_active_slot_ids": ("frequency", "forecast_horizon"),
             },
-            "Which prediction interval levels should the sales forecast include?",
+            "Which prediction interval levels should the sales forecast include? Example answer: 80 and 95 percent.",
         ),
     ],
     ids=(
@@ -115,7 +119,7 @@ def test_accepts_valid_bounded_selected_slot_questions(
 
 
 def test_static_fallback_uses_schema_wording() -> None:
-    assert static_fallback_question(_request()).question == "How often are sales observed?"
+    assert static_fallback_question(_request()).question == "How often are sales observed? Example answer: 1 day."
 
 
 def test_question_instructions_include_llmrei_long_behaviors() -> None:
@@ -124,6 +128,13 @@ def test_question_instructions_include_llmrei_long_behaviors() -> None:
     assert "do not assume" in instructions
     assert "selected slot" in instructions
     assert "do not ask about any other slot" in instructions
+    assert "example answer" in instructions
+
+
+def test_rejects_question_without_example_answer() -> None:
+    assert not validate_question(
+        QuestionOutput(question="How often are sales observed?"), _request()
+    )
 
 
 def test_question_input_redacts_provider_bound_credentials() -> None:
@@ -135,3 +146,45 @@ def test_question_input_redacts_provider_bound_credentials() -> None:
 
     assert "super-secret" not in json.dumps(payload)
     assert payload["confirmed_context"]["target"] == "sales"
+
+
+def test_examples_follow_annual_single_series_context() -> None:
+    context = {
+        "frequency": {"periods": 1, "unit": "year"},
+        "dataset_type": "single_series",
+        "source_mode": "catalog",
+        "source_provider": "World Bank",
+    }
+
+    horizon_request = _request(
+        slot_id="forecast_horizon",
+        confirmed_context={},
+        known_context=context,
+        static_question="How far ahead should the forecast extend?",
+        allowed_values=(),
+        other_active_slot_ids=(),
+    )
+    output_request = _request(
+        slot_id="output_granularity",
+        confirmed_context={},
+        known_context=context,
+        static_question="At what level should the forecast be returned?",
+        allowed_values=(),
+        other_active_slot_ids=(),
+    )
+    level_request = _request(
+        slot_id="aggregation_level",
+        confirmed_context={},
+        known_context=context,
+        static_question="At which level should forecasts be returned?",
+        allowed_values=(),
+        other_active_slot_ids=(),
+    )
+
+    assert example_answer(horizon_request) == "3 years"
+    assert example_answer(output_request) == "annual"
+    assert example_answer(level_request) == "overall series"
+
+    payload = json.loads(build_question_input(horizon_request))
+    assert payload["known_context"] == context
+    assert payload["example_answer"] == "3 years"

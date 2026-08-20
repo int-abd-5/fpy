@@ -80,14 +80,14 @@ async def test_complete_prompt_returns_confirmation_summary() -> None:
 async def test_missing_target_asks_exactly_one_target_question() -> None:
     client = FakeLLMClient(
         [_complete_result(omit={"target_column"})],
-        [QuestionOutput(question="Which target column should be forecast?")],
+        [QuestionOutput(question="Which target column should be forecast? Example answer: btc_usd_close.")],
     )
     engine, _, dialogue_id = await _start(client)
 
     result = await engine.handle_user_message(dialogue_id, MESSAGE)
 
     assert not result.readiness.ready
-    assert result.assistant_message == "Which target column should be forecast?"
+    assert result.assistant_message == "Which target column should be forecast? Example answer: btc_usd_close."
     assert client.ask_requests[0].slot_id == "target_column"
 
 
@@ -97,14 +97,14 @@ async def test_invalid_generated_question_retries_once_then_uses_valid_output() 
         [_complete_result(omit={"target_column"})],
         [
             QuestionOutput(question="What is the target? What is the horizon?"),
-            QuestionOutput(question="Which target column should be forecast?"),
+            QuestionOutput(question="Which target column should be forecast? Example answer: btc_usd_close."),
         ],
     )
     engine, _, dialogue_id = await _start(client)
 
     result = await engine.handle_user_message(dialogue_id, MESSAGE)
 
-    assert result.assistant_message == "Which target column should be forecast?"
+    assert result.assistant_message == "Which target column should be forecast? Example answer: btc_usd_close."
     assert len(client.ask_requests) == 2
 
 
@@ -171,7 +171,7 @@ async def test_provider_failure_uses_static_question_without_slot_mutation() -> 
 
     result = await engine.handle_user_message(dialogue_id, "I need a forecast")
 
-    assert result.assistant_message == load_schema().get("intent").static_question
+    assert result.assistant_message == "Do you want the system to create a time-series forecast? Example answer: yes."
     assert result.state.slots == before.slots
 
 
@@ -179,12 +179,12 @@ async def test_provider_failure_uses_static_question_without_slot_mutation() -> 
 async def test_selected_enum_answer_recovers_when_extractor_fails() -> None:
     client = FakeLLMClient(
         [_complete_result(omit={"source_mode"})],
-        [QuestionOutput(question="Will the data be uploaded, read from an API, read from a database, or selected from a catalog?")],
+        [QuestionOutput(question="Will the data be uploaded, read from an API, read from a database, or selected from a catalog? Example answer: upload.")],
     )
     engine, _, dialogue_id = await _start(client)
 
     first = await engine.handle_user_message(dialogue_id, MESSAGE)
-    assert first.assistant_message == "Will the data be uploaded, read from an API, read from a database, or selected from a catalog?"
+    assert first.assistant_message == "Will the data be uploaded, read from an API, read from a database, or selected from a catalog? Example answer: upload."
 
     result = await engine.handle_user_message(dialogue_id, "upload")
 
@@ -200,21 +200,21 @@ async def test_selected_boolean_answer_recovers_when_extractor_fails() -> None:
         [_complete_result(omit={"contains_sensitive_data"})],
         [
             QuestionOutput(
-                question="Does the source contain personal, confidential, or regulated data?"
+                question="Does the source contain personal, confidential, or regulated data? Example answer: no."
             ),
-            QuestionOutput(question="Which privacy or access restrictions apply?"),
+            QuestionOutput(question="Which privacy or access restrictions apply? Example answer: none."),
         ],
     )
     engine, _, dialogue_id = await _start(client)
 
     first = await engine.handle_user_message(dialogue_id, MESSAGE)
-    assert first.assistant_message == "Does the source contain personal, confidential, or regulated data?"
+    assert first.assistant_message == "Does the source contain personal, confidential, or regulated data? Example answer: no."
 
     result = await engine.handle_user_message(dialogue_id, "yes")
 
     assert result.state.slots["contains_sensitive_data"].value is True
     assert result.state.slots["contains_sensitive_data"].status == SlotStatus.PROVIDED
-    assert result.assistant_message == "Which privacy or access restrictions apply?"
+    assert result.assistant_message == "Which privacy or access restrictions apply? Example answer: none."
 
 
 @pytest.mark.asyncio
@@ -257,18 +257,47 @@ async def test_selected_intent_question_accepts_yes_confirmation() -> None:
             initial_result,
             ExtractorResult(intent=Intent.AMBIGUOUS, intent_confidence=0.4),
         ],
-        [QuestionOutput(question="Do you want the system to create a time-series forecast?")],
+        [QuestionOutput(question="Do you want the system to create a time-series forecast? Example answer: yes.")],
     )
     engine, _, dialogue_id = await _start(client)
 
     first = await engine.handle_user_message(dialogue_id, MESSAGE)
     second = await engine.handle_user_message(dialogue_id, "yes")
 
-    assert first.assistant_message == "Do you want the system to create a time-series forecast?"
+    assert first.assistant_message == "Do you want the system to create a time-series forecast? Example answer: yes."
     assert second.state.intent == Intent.CREATE_FORECAST
     assert second.state.slots["intent"].value == Intent.CREATE_FORECAST.value
     assert second.state.slots["intent"].status == SlotStatus.PROVIDED
     assert second.assistant_message != "Do you want the system to create a time-series forecast?"
+
+
+@pytest.mark.asyncio
+async def test_create_forecast_intent_stays_locked_across_fifteen_bad_extractions() -> None:
+    initial_result = _complete_result(omit={"target_column"})
+    bad_results = [
+        ExtractorResult(intent=Intent.NOT_FORECASTING, intent_confidence=0.99)
+        for _ in range(15)
+    ]
+    client = FakeLLMClient(
+        [initial_result, *bad_results],
+        [
+            QuestionOutput(
+                question="Which target column should be forecast? Example answer: revenue."
+            )
+            for _ in range(15)
+        ],
+    )
+    engine, _, dialogue_id = await _start(client)
+
+    first = await engine.handle_user_message(dialogue_id, MESSAGE)
+    assert first.state.intent == Intent.CREATE_FORECAST
+
+    results = []
+    for index in range(15):
+        results.append(await engine.handle_user_message(dialogue_id, f"unclear answer {index}"))
+
+    assert all(result.state.intent == Intent.CREATE_FORECAST for result in results)
+    assert all("supports time-series" not in result.assistant_message for result in results)
 
 
 @pytest.mark.asyncio

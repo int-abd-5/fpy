@@ -92,10 +92,15 @@ def apply_extraction(
 ) -> DialogueState:
     _check_contract(state, result, schema, current_message)
     updated_state = deepcopy(state)
-    updated_state.intent = result.intent
+    forecasting_intent_locked = state.intent == Intent.CREATE_FORECAST
+    updated_state.intent = (
+        Intent.CREATE_FORECAST if forecasting_intent_locked else result.intent
+    )
     for update in result.updates:
         _apply_update(updated_state, result, update, schema, turn_number)
-    if result.intent == Intent.CREATE_FORECAST:
+    if forecasting_intent_locked:
+        updated_state.slots["intent"] = deepcopy(state.slots["intent"])
+    elif result.intent == Intent.CREATE_FORECAST:
         intent_slot = updated_state.slots["intent"]
         intent_update = next(
             (update for update in result.updates if update.slot_id == "intent"),

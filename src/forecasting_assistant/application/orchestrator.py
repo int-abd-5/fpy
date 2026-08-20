@@ -76,6 +76,15 @@ class ElicitationEngine:
             and (slot.confirmed_by_user or slot.status == SlotStatus.CONFIRMED)
         }
 
+    def _known_context(self, state: DialogueState) -> dict[str, Any]:
+        return {
+            slot_id: slot.value
+            for slot_id, slot in state.slots.items()
+            if slot_id != "authentication_reference"
+            and slot.value is not None
+            and slot.status != SlotStatus.UNMENTIONED
+        }
+
     def _question_request(self, state: DialogueState, slot_id: str, reason: str) -> QuestionRequest:
         definition = self._schema.get(slot_id)
         active_ids = tuple(
@@ -89,6 +98,7 @@ class ElicitationEngine:
             slot_description=definition.description,
             current_state=state.slots[slot_id].model_copy(deep=True),
             confirmed_context=self._confirmed_context(state),
+            known_context=self._known_context(state),
             static_question=definition.static_question,
             allowed_values=definition.allowed_values,
             other_active_slot_ids=active_ids,
@@ -241,7 +251,6 @@ class ElicitationEngine:
                     turn_number,
                     message,
                 )
-                updated.intent = extraction.intent
                 state = updated
                 self._repository.append_event(
                     dialogue_id,

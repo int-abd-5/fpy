@@ -239,6 +239,44 @@ def test_top_level_forecast_intent_populates_required_intent_slot() -> None:
     assert updated.slots["intent"].evidence_text == "Forecast bitcoin prices"
 
 
+def test_create_forecast_intent_cannot_be_downgraded_by_later_extraction() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    state.intent = Intent.CREATE_FORECAST
+    state.slots["intent"] = SlotState(
+        slot_id="intent",
+        value=Intent.CREATE_FORECAST.value,
+        status=SlotStatus.PROVIDED,
+        confidence=1.0,
+        evidence_text="I need a forecast",
+        source_turn=1,
+    )
+
+    updated = apply_extraction(
+        state,
+        ExtractorResult(
+            intent=Intent.NOT_FORECASTING,
+            intent_confidence=0.99,
+            updates=[
+                SlotUpdate(
+                    slot_id="intent",
+                    candidate_value=Intent.NOT_FORECASTING.value,
+                    status=SlotStatus.PROVIDED,
+                    confidence=0.99,
+                    evidence_text="no",
+                )
+            ],
+        ),
+        schema,
+        2,
+        "no",
+    )
+
+    assert updated.intent == Intent.CREATE_FORECAST
+    assert updated.slots["intent"].value == Intent.CREATE_FORECAST.value
+    assert updated.slots["intent"].evidence_text == "I need a forecast"
+
+
 def test_valid_update_preserves_existing_validation_errors_only_when_conflicting() -> None:
     schema = load_schema()
     state = create_initial_state(schema)
