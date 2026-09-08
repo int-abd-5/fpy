@@ -10,6 +10,7 @@ def test_settings_accept_an_explicit_model_name() -> None:
 
     assert settings.openai_model == "test-model"
     assert settings.dataset_store_path == "dataset_store"
+    assert settings.elicitation_log_path == "logs/elicitation_pipeline.jsonl"
     assert settings.schema_version == "1.0.0"
     assert settings.prompt_version == "llmrei-long-forecasting-v1"
 

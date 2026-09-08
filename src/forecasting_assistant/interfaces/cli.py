@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Callable
+from typing import Any
 from uuid import UUID
 
 import typer
@@ -18,7 +20,11 @@ from forecasting_assistant.infrastructure.datasets.registry import build_default
 from forecasting_assistant.infrastructure.datasets.sqlite_repository import (
     SQLiteDatasetCatalogRepository,
 )
-from forecasting_assistant.infrastructure.llm.openai_responses import OpenAIResponsesClient
+from forecasting_assistant.infrastructure.llm.openai_responses import (
+    OpenAIResponsesClient,
+    PersistentOpenAIResponsesClient,
+)
+from forecasting_assistant.infrastructure.observability.pipeline_logger import JsonlPipelineLogger
 from forecasting_assistant.infrastructure.persistence.sqlite_repository import (
     SQLiteDialogueRepository,
 )
@@ -31,19 +37,46 @@ def main() -> None:
     """Run forecasting requirement elicitation commands."""
 
 
-def build_engine() -> ElicitationEngine:
+def _emit_trace(stage: str, payload: dict[str, Any]) -> None:
+    typer.echo(
+        f"[trace] {stage} {json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)}",
+        err=True,
+    )
+
+
+def _compose_trace_sinks(
+    *sinks: Callable[[str, dict[str, Any]], None] | None,
+) -> Callable[[str, dict[str, Any]], None]:
+    active_sinks = [sink for sink in sinks if sink is not None]
+
+    def emit(stage: str, payload: dict[str, Any]) -> None:
+        for sink in active_sinks:
+            sink(stage, payload)
+
+    return emit
+
+
+def build_engine(
+    *,
+    trace_sink: Callable[[str, dict[str, Any]], None] | None = None,
+    persistent: bool = False,
+) -> ElicitationEngine:
     settings = get_settings()
     if not settings.openai_api_key:
         raise typer.BadParameter("OPENAI_API_KEY is required for the LLM interview command")
     schema = load_schema(settings.schema_version)
+    pipeline_sink = JsonlPipelineLogger(settings.elicitation_log_path)
+    combined_sink = _compose_trace_sinks(pipeline_sink, trace_sink)
     repository = SQLiteDialogueRepository(settings.elicitation_db_path)
     repository.initialize()
-    provider = OpenAIResponsesClient(
+    provider_class = PersistentOpenAIResponsesClient if persistent else OpenAIResponsesClient
+    provider = provider_class(
         settings.openai_api_key,
         settings.openai_model,
         schema,
+        trace_sink=combined_sink,
     )
-    return ElicitationEngine(schema, provider, repository)
+    return ElicitationEngine(schema, provider, repository, trace_sink=combined_sink)
 
 
 def _world_bank_demo_values() -> dict[str, object]:
@@ -155,14 +188,12 @@ def _render_source_plan(plan: SourcePlan) -> str:
     return json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True, default=str)
 
 
-@app.command()
-def interview(
-    dialogue_id: str | None = typer.Option(
-        None, "--dialogue-id", help="Resume an existing dialogue UUID."
-    ),
+async def _run_interview(
+    engine: ElicitationEngine,
+    dialogue_id: str | None,
+    *,
+    persistent: bool = False,
 ) -> None:
-    """Run an interactive forecasting requirements interview."""
-    engine = build_engine()
     if dialogue_id is None:
         state = engine.start_dialogue()
     else:
@@ -209,9 +240,49 @@ def interview(
             typer.echo(_render_source_plan(plan))
             return
 
-        result = asyncio.run(engine.handle_user_message(state.dialogue_id, message))
+        result = await engine.handle_user_message(state.dialogue_id, message)
         state = result.state
         typer.echo(result.assistant_message)
+        if result.specification is not None:
+            if result.specification.values.get("source_mode") == "catalog":
+                service, _ = build_dataset_service()
+                plan = service.discover_for_specification(result.specification)
+                typer.echo("Dataset recommendations (explicit selection is still required):")
+                typer.echo(_render_source_plan(plan))
+            return
+
+
+@app.command()
+def interview(
+    dialogue_id: str | None = typer.Option(
+        None, "--dialogue-id", help="Resume an existing dialogue UUID."
+    ),
+    trace: bool = typer.Option(
+        False,
+        "--trace",
+        help="Print sanitized API requests, responses, and state transitions.",
+    ),
+) -> None:
+    """Run an interactive forecasting requirements interview."""
+    engine = build_engine(trace_sink=_emit_trace) if trace else build_engine()
+    asyncio.run(_run_interview(engine, dialogue_id))
+
+
+@app.command("persistent-interview")
+def persistent_interview(
+    dialogue_id: str | None = typer.Option(
+        None, "--dialogue-id", help="Resume an existing dialogue UUID."
+    ),
+    trace: bool = typer.Option(
+        False,
+        "--trace",
+        help="Compatibility flag; persistent mode keeps diagnostics in the log file.",
+    ),
+) -> None:
+    """Run the pilot interview with one persistent provider conversation."""
+    del trace
+    engine = build_engine(persistent=True)
+    asyncio.run(_run_interview(engine, dialogue_id, persistent=True))
 
 
 @app.command("discover-datasets")

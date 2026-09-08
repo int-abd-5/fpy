@@ -2,6 +2,8 @@ from copy import deepcopy
 
 from forecasting_assistant.application.clarification import (
     evaluate_readiness,
+    intermediate_core_slot_ids,
+    rank_priority_slots,
     select_next_slot,
 )
 from forecasting_assistant.domain.models import (
@@ -43,7 +45,7 @@ def _resolved_state():
                 status=SlotStatus.PROVIDED,
                 evidence_text="resolved",
             )
-    for slot_id in ("file_format", "contains_sensitive_data"):
+    for slot_id in ("file_format", "contains_sensitive_data", "source_reference"):
         state.slots[slot_id] = SlotState(
             slot_id=slot_id,
             value=values[slot_id],
@@ -91,6 +93,28 @@ def test_inactive_conditionals_and_optional_slots_do_not_block() -> None:
     assert "hierarchy_columns" not in report.unresolved_slots
     assert "stakeholder_role" not in report.unresolved_slots
     assert state == before
+
+
+def test_catalog_defers_dataset_details_until_a_dataset_is_selected() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    state.intent = Intent.CREATE_FORECAST
+    state.slots["source_mode"] = SlotState(
+        slot_id="source_mode",
+        value="catalog",
+        status=SlotStatus.PROVIDED,
+        evidence_text="catalog",
+    )
+
+    core_slots = intermediate_core_slot_ids(schema, state)
+    report = evaluate_readiness(schema, state)
+
+    assert "frequency" not in core_slots
+    assert "dataset_type" not in core_slots
+    assert "source_provider" not in report.active_required_slots
+    assert "contains_sensitive_data" not in report.active_required_slots
+    assert "frequency" not in report.unresolved_slots
+    assert "dataset_type" not in report.unresolved_slots
 
 
 def test_select_next_slot_uses_required_status_priority() -> None:
@@ -166,3 +190,160 @@ def test_high_impact_optional_can_block_and_be_selected() -> None:
 
     assert not evaluate_readiness(schema, state).ready
     assert select_next_slot(schema, state).slot_id == "optional"
+
+
+def test_data_source_is_asked_before_dataset_column_questions() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    state.intent = Intent.CREATE_FORECAST
+    state.slots["intent"] = SlotState(
+        slot_id="intent",
+        value=Intent.CREATE_FORECAST.value,
+        status=SlotStatus.PROVIDED,
+        evidence_text="forecast",
+    )
+
+    candidate = select_next_slot(schema, state)
+
+    assert candidate is not None
+    assert candidate.slot_id == "source_mode"
+
+
+def test_source_reference_is_asked_before_target_column_after_source_mode() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    state.intent = Intent.CREATE_FORECAST
+    state.slots["intent"] = SlotState(
+        slot_id="intent",
+        value=Intent.CREATE_FORECAST.value,
+        status=SlotStatus.PROVIDED,
+        evidence_text="forecast",
+    )
+    state.slots["source_mode"] = SlotState(
+        slot_id="source_mode",
+        value="upload",
+        status=SlotStatus.PROVIDED,
+        evidence_text="upload",
+    )
+
+    candidate = select_next_slot(schema, state)
+
+    assert candidate is not None
+    assert candidate.slot_id == "source_reference"
+
+
+def test_catalog_mode_does_not_ask_novice_for_internal_source_identifier() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    state.intent = Intent.CREATE_FORECAST
+    state.slots["intent"] = SlotState(
+        slot_id="intent",
+        value=Intent.CREATE_FORECAST.value,
+        status=SlotStatus.PROVIDED,
+        evidence_text="forecast",
+    )
+    state.slots["source_mode"] = SlotState(
+        slot_id="source_mode",
+        value="catalog",
+        status=SlotStatus.PROVIDED,
+        evidence_text="catalog",
+    )
+
+    candidate = select_next_slot(schema, state)
+
+    assert candidate is not None
+    assert candidate.slot_id != "source_reference"
+
+
+def test_catalog_mode_defers_dataset_questions_until_schema_is_available() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    state.intent = Intent.CREATE_FORECAST
+    state.slots["intent"] = SlotState(
+        slot_id="intent",
+        value=Intent.CREATE_FORECAST.value,
+        status=SlotStatus.PROVIDED,
+        evidence_text="forecast",
+    )
+    state.slots["source_mode"] = SlotState(
+        slot_id="source_mode",
+        value="catalog",
+        status=SlotStatus.PROVIDED,
+        evidence_text="catalog",
+    )
+
+    core_ids = set(intermediate_core_slot_ids(schema, state))
+    ranked_ids = {item["slot_id"] for item in rank_priority_slots(schema, state)}
+
+    assert not core_ids.intersection(
+        {"target_column", "time_column", "dataset_type", "series_id_columns", "hierarchy_columns"}
+    )
+    assert not ranked_ids.intersection(
+        {"target_column", "time_column", "dataset_type", "series_id_columns", "hierarchy_columns"}
+    )
+
+
+def test_catalog_mode_reactivates_dataset_questions_after_schema_is_available() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    state.intent = Intent.CREATE_FORECAST
+    state.slots["intent"] = SlotState(
+        slot_id="intent",
+        value=Intent.CREATE_FORECAST.value,
+        status=SlotStatus.PROVIDED,
+        evidence_text="forecast",
+    )
+    state.slots["source_mode"] = SlotState(
+        slot_id="source_mode",
+        value="catalog",
+        status=SlotStatus.PROVIDED,
+        evidence_text="catalog",
+    )
+    state.dataset_columns = ["date", "country", "inflation"]
+
+    core_ids = set(intermediate_core_slot_ids(schema, state))
+
+    assert {"target_column", "time_column", "dataset_type"} <= core_ids
+
+
+def test_priority_slots_are_numbered_for_the_intermediate_interview() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    state.intent = Intent.CREATE_FORECAST
+
+    ranked = rank_priority_slots(schema, state)
+
+    assert ranked
+    assert len(ranked) <= 12
+    assert [item["rank"] for item in ranked] == list(range(1, len(ranked) + 1))
+    assert all(
+        {"rank", "slot_id", "question", "priority", "status", "aspect", "dimension", "gate_status"}
+        <= set(item)
+        for item in ranked
+    )
+    assert ranked[0]["priority"] >= ranked[-1]["priority"]
+
+
+def test_forecast_intent_is_gate_pruned_from_priority_slots() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    state.intent = Intent.CREATE_FORECAST
+
+    ranked = rank_priority_slots(schema, state)
+
+    assert "intent" not in {item["slot_id"] for item in ranked}
+
+
+def test_intermediate_readiness_stops_before_advanced_machine_learning_details() -> None:
+    schema, state = _resolved_state()
+    state.slots["business_goal"] = SlotState(slot_id="business_goal")
+    state.slots["success_criteria"] = SlotState(slot_id="success_criteria")
+    state.slots["forecast_type"] = SlotState(slot_id="forecast_type")
+    state.slots["primary_metric"] = SlotState(slot_id="primary_metric")
+
+    report = evaluate_readiness(schema, state)
+
+    assert report.ready
+    assert {"business_goal", "success_criteria", "forecast_type", "primary_metric"} <= set(
+        report.unresolved_slots
+    )

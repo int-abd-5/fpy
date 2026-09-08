@@ -3,7 +3,7 @@ from datetime import date, datetime, time
 
 import pytest
 
-from forecasting_assistant.domain.models import SlotState, SlotStatus
+from forecasting_assistant.domain.models import DialogueTurn, SlotState, SlotStatus
 from forecasting_assistant.domain.schema import create_initial_state, load_schema
 from forecasting_assistant.prompts.extractor import (
     build_extractor_input,
@@ -125,3 +125,48 @@ def test_preserves_benign_filename_text() -> None:
 
     assert "api_key_reference.csv" in payload["current_message"]
     assert "password_reset.csv" in payload["current_message"]
+
+
+def test_input_identifies_the_pending_slot_and_latest_question() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    state.intent = "create_forecast"
+    state.slots["intent"] = SlotState(
+        slot_id="intent",
+        value="create_forecast",
+        status=SlotStatus.PROVIDED,
+        confidence=1.0,
+        evidence_text="I need a forecast.",
+    )
+    state.turns.append(
+        DialogueTurn(
+            turn_number=1,
+            user_message="I need a forecast.",
+            assistant_message="Which target column should be forecast? Example answer: revenue.",
+        )
+    )
+
+    payload = json.loads(build_extractor_input("revenue", state, schema))
+
+    assert payload["pending_slot"]["slot_id"] == "source_mode"
+    assert payload["latest_assistant_question"].startswith("Which target column")
+
+
+def test_input_includes_columns_discovered_from_the_dataset() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    state.dataset_columns = ["date", "close", "volume"]
+
+    payload = json.loads(build_extractor_input("close", state, schema))
+
+    assert payload["available_dataset_columns"] == ["date", "close", "volume"]
+
+
+def test_input_contains_numbered_intermediate_priority_slots() -> None:
+    schema = load_schema()
+    payload = json.loads(build_extractor_input("I need a forecast.", create_initial_state(schema), schema))
+
+    assert payload["interview_policy"] == {"stage": "intermediate", "stop_after_core": True}
+    assert payload["priority_slots"]
+    assert payload["priority_slots"][0]["rank"] == 1
+    assert all(item["question"] for item in payload["priority_slots"])

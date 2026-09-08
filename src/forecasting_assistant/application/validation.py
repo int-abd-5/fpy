@@ -8,13 +8,33 @@ from forecasting_assistant.domain.conditions import is_slot_active
 from forecasting_assistant.domain.models import DialogueState, SlotState, ValidationIssue
 from forecasting_assistant.domain.schema import ForecastingSchema, SlotDefinition
 
-
 _CREDENTIAL_PATTERN = re.compile(
     r"(?:sk-[A-Za-z0-9]|AKIA[0-9A-Z]{16}|Bearer\s+|"
     r"[\"']?(?:api\s*[_-]?\s*key|access\s*[_-]?\s*token|token|password|passwd|secret|signature)[\"']?"
     r"\s*(?:[:=])\s*[\"']?[^\s,\"'}]+)",
     re.I,
 )
+
+_REFERENCE_SLOT_IDS = {
+    "target_column",
+    "time_column",
+    "series_id_columns",
+    "hierarchy_columns",
+    "source_reference",
+}
+_UNUSABLE_REFERENCE_PHRASES = {
+    "no",
+    "none",
+    "no dataset",
+    "no data",
+    "not available",
+    "unknown",
+    "the system will fetch it",
+    "system will fetch it",
+    "not provided",
+    "yes",
+    "true",
+}
 
 
 def _issue(slot_id: str | None, code: str, message: str) -> ValidationIssue:
@@ -71,6 +91,23 @@ def _outside_range(value: Any, minimum: float, maximum: float) -> bool:
     return number is None or not minimum <= number <= maximum
 
 
+def _column_values(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value]
+    return [str(value).strip()]
+
+
+def is_unusable_reference(slot_id: str, value: Any) -> bool:
+    if slot_id not in _REFERENCE_SLOT_IDS:
+        return False
+    values = value if isinstance(value, list) else [value]
+    for item in values:
+        normalized = re.sub(r"\s+", " ", str(item).strip().casefold())
+        if normalized in _UNUSABLE_REFERENCE_PHRASES:
+            return True
+    return False
+
+
 def validate_slot(
     definition: SlotDefinition, state: SlotState
 ) -> list[ValidationIssue]:
@@ -78,6 +115,14 @@ def validate_slot(
     issues: list[ValidationIssue] = []
     if value is None:
         return issues
+    if is_unusable_reference(definition.slot_id, value):
+        issues.append(
+            _issue(
+                definition.slot_id,
+                "unusable_reference",
+                "Provide a real file, source, or column name, or choose that the data still needs to be found.",
+            )
+        )
     if definition.value_type == "datetime" and not isinstance(value, datetime):
         issues.append(_issue(definition.slot_id, "invalid_datetime", "Value must be a valid datetime."))
     if definition.allowed_values and definition.value_type == "enum" and value not in definition.allowed_values:
@@ -134,4 +179,23 @@ def validate_dialogue(schema: ForecastingSchema, state: DialogueState) -> list[V
         issues.append(_issue("forecast_type", "probabilistic_output_required", "Probabilistic output requires intervals or quantiles."))
     if value("known_future_covariates") and not value("covariate_availability"):
         issues.append(_issue("covariate_availability", "covariate_availability_required", "Future covariates require availability information."))
+    if state.dataset_columns:
+        available = {column.casefold() for column in state.dataset_columns}
+        for slot_id in ("target_column", "time_column", "series_id_columns", "hierarchy_columns"):
+            selected = value(slot_id)
+            if selected is None:
+                continue
+            missing = [
+                column
+                for column in _column_values(selected)
+                if column and column.casefold() not in available
+            ]
+            if missing:
+                issues.append(
+                    _issue(
+                        slot_id,
+                        "dataset_column_not_found",
+                        f"Column(s) not found in the available dataset: {', '.join(missing)}.",
+                    )
+                )
     return issues

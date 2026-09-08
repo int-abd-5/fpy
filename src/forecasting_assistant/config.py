@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = "gpt-4.1-mini"
     elicitation_db_path: str = "elicitation.db"
+    elicitation_log_path: str = "logs/elicitation_pipeline.jsonl"
     dataset_store_path: str = "dataset_store"
     schema_version: str = "1.0.0"
     prompt_version: str = "llmrei-long-forecasting-v1"

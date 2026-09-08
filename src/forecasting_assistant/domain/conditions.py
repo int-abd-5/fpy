@@ -4,7 +4,6 @@ from collections.abc import Callable
 from forecasting_assistant.domain.models import DialogueState, SlotStatus
 from forecasting_assistant.domain.schema import SlotDefinition
 
-
 _DURATION_UNITS = {
     "second": "second", "seconds": "second", "secondly": "second",
     "minute": "minute", "minutes": "minute", "minutely": "minute",
@@ -141,6 +140,7 @@ RULES: dict[str, Callable[[DialogueState], bool]] = {
         and not _same_granularity(state)
     ),
     "external_provider": lambda state: _value(state, "source_mode") in {"api", "catalog"},
+    "source_reference_required": lambda state: _value(state, "source_mode") != "catalog",
     "probabilistic_output": lambda state: _value(state, "forecast_type") in {"probabilistic", "both"},
     "quantile_output_required": lambda state: _mentioned(state, "quantiles"),
     "source_is_upload": lambda state: _value(state, "source_mode") == "upload",

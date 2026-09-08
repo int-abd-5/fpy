@@ -6,6 +6,7 @@ from forecasting_assistant.domain.models import QuestionOutput, QuestionRequest,
 from forecasting_assistant.prompts.llmrei_long import (
     build_question_input,
     build_question_instructions,
+    example_answer,
     static_fallback_question,
     validate_question,
 )
@@ -39,9 +40,46 @@ def test_rejects_question_that_suggests_unconfirmed_value() -> None:
     )
 
 
+def test_allows_a_question_that_lists_unconfirmed_choices() -> None:
+    request = _request(
+        slot_id="source_mode",
+        slot_description="How the data will be provided.",
+        current_state=SlotState(slot_id="source_mode"),
+        static_question="How will the data be provided?",
+        allowed_values=("upload", "api", "database", "catalog"),
+        other_active_slot_ids=("frequency", "target_column"),
+    )
+
+    assert validate_question(
+        QuestionOutput(
+            question=(
+                "How will you provide the data: upload a file, connect via API, "
+                "use a database, or choose from our catalog? Example answer: upload a file."
+            )
+        ),
+        request,
+    )
+
+
 def test_allows_candidate_already_present_in_confirmed_context() -> None:
     request = _request(confirmed_context={"frequency": "weekly", "target": "sales"})
-    assert validate_question(QuestionOutput(question="Is weekly still the frequency?"), request)
+    assert validate_question(
+        QuestionOutput(question="Is weekly still the frequency? Example answer: weekly."),
+        request,
+    )
+
+
+def test_questions_require_an_illustrative_example_answer() -> None:
+    request = _request()
+
+    assert validate_question(
+        QuestionOutput(question="How often are sales observations recorded? Example answer: daily."),
+        request,
+    )
+    assert not validate_question(
+        QuestionOutput(question="How often are sales observations recorded?"),
+        request,
+    )
 
 
 def test_rejects_different_active_slot() -> None:
@@ -52,8 +90,8 @@ def test_rejects_different_active_slot() -> None:
 @pytest.mark.parametrize(
     ("request_changes", "question"),
     [
-        ({}, "How often are sales observations recorded?"),
-        ({}, "What is the observation cadence for sales?"),
+        ({}, "How often are sales observations recorded? Example answer: daily."),
+        ({}, "What is the observation cadence for sales? Example answer: daily."),
         (
             {
                 "slot_id": "forecast_horizon",
@@ -63,7 +101,7 @@ def test_rejects_different_active_slot() -> None:
                 "allowed_values": (),
                 "other_active_slot_ids": ("frequency", "target_column"),
             },
-            "How far ahead should sales be forecast?",
+            "How far ahead should sales be forecast? Example answer: 12 months.",
         ),
         (
             {
@@ -74,7 +112,7 @@ def test_rejects_different_active_slot() -> None:
                 "allowed_values": (),
                 "other_active_slot_ids": ("frequency", "forecast_horizon"),
             },
-            "Which column contains the sales values to forecast?",
+            "Which column contains the sales values to forecast? Example answer: revenue.",
         ),
         (
             {
@@ -85,7 +123,7 @@ def test_rejects_different_active_slot() -> None:
                 "allowed_values": (),
                 "other_active_slot_ids": ("frequency", "forecast_horizon"),
             },
-            "Where is the sales history located?",
+            "Where is the sales history located? Example answer: sales.xlsx.",
         ),
         (
             {
@@ -96,7 +134,7 @@ def test_rejects_different_active_slot() -> None:
                 "allowed_values": (),
                 "other_active_slot_ids": ("frequency", "forecast_horizon"),
             },
-            "Which prediction interval levels should the sales forecast include?",
+            "Which prediction interval levels should the sales forecast include? Example answer: 80% and 95%.",
         ),
     ],
     ids=(
@@ -115,7 +153,34 @@ def test_accepts_valid_bounded_selected_slot_questions(
 
 
 def test_static_fallback_uses_schema_wording() -> None:
-    assert static_fallback_question(_request()).question == "How often are sales observed?"
+    assert static_fallback_question(_request()).question == (
+        "How often are sales observed? Example answer: once per day."
+    )
+
+
+def test_question_input_contains_the_selected_slot_example() -> None:
+    payload = json.loads(build_question_input(_request()))
+
+    assert payload["example_answer"] == "once per day"
+    assert example_answer(_request()) == "once per day"
+
+
+def test_question_input_contains_numbered_intermediate_priority_slots() -> None:
+    request = _request(
+        priority_slots=(
+            {
+                "rank": 1,
+                "slot_id": "frequency",
+                "question": "How often are sales observed?",
+                "priority": 100,
+                "status": "unmentioned",
+            },
+        )
+    )
+
+    payload = json.loads(build_question_input(request))
+
+    assert payload["priority_slots"][0]["rank"] == 1
 
 
 def test_question_instructions_include_llmrei_long_behaviors() -> None:
@@ -124,6 +189,9 @@ def test_question_instructions_include_llmrei_long_behaviors() -> None:
     assert "do not assume" in instructions
     assert "selected slot" in instructions
     assert "do not ask about any other slot" in instructions
+    assert "example answer" in instructions
+    assert "everyday language" in instructions
+    assert "point forecast" in instructions
 
 
 def test_question_input_redacts_provider_bound_credentials() -> None:

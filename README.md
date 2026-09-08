@@ -63,6 +63,7 @@ Configure `.env`:
 OPENAI_API_KEY=your-provider-key
 OPENAI_MODEL=your-structured-output-model
 ELICITATION_DB_PATH=elicitation.db
+ELICITATION_LOG_PATH=logs/elicitation_pipeline.jsonl
 SCHEMA_VERSION=1.0.0
 PROMPT_VERSION=llmrei-long-forecasting-v1
 ```
@@ -81,6 +82,32 @@ Resume an existing dialogue:
 forecast-elicitation interview --dialogue-id 00000000-0000-0000-0000-000000000000
 ```
 
+To inspect the complete data flow during an interview, enable the redacted trace:
+
+```bash
+forecast-elicitation interview --trace
+```
+
+For the persistent-context pilot, run:
+
+```bash
+forecast-elicitation persistent-interview
+```
+
+This pilot creates one OpenAI Conversations API conversation for each dialogue and reuses it for the extraction, question, and user-follow-up chat calls. The conversation ID is saved with the local dialogue state, while SQLite remains authoritative for slot values, validation, readiness, and confirmation. The pilot uses provider-side storage, so use it only with data that is appropriate for that retention policy. The normal `interview` command remains stateless at the provider. Follow-up questions such as “What does this mean?” are answered in plain language and do not fill or change the pending requirement.
+
+Every interview also appends the same redacted pipeline events to `logs/elicitation_pipeline.jsonl` by default. Set `ELICITATION_LOG_PATH` in `.env` to change the location. The file records timestamps, API request features and inputs, structured responses, state recovery/reducer results, selected next slots, and the exact assistant message shown to the user. API keys and credential values are redacted, but user messages can still contain sensitive business data; treat this file as sensitive.
+
+The normal `interview --trace` command additionally prints those events to the terminal. API keys and credential values are never printed. Persistent interview is always chat-only in the terminal, even if the compatibility flag `persistent-interview --trace` is supplied; its diagnostics remain in the JSONL log file.
+
+Useful trace stages include:
+
+- `api.extract.request`: the instructions and JSON input sent for answer extraction.
+- `api.extract.response`: the structured intent and slot updates returned by the model.
+- `state.extraction_applied` or `state.recovery_applied`: what the application stored.
+- `state.next_slot`: why the next question was selected.
+- `api.question.request` and `api.question.response`: the question-generation exchange.
+
 Commands:
 
 - `/show` prints the current persisted, redacted dialogue state.
@@ -88,6 +115,28 @@ Commands:
 - `/quit` exits without confirming.
 
 The CLI emits one assistant message per user turn.
+
+## Web Preview
+
+Run the persistent interview preview locally:
+
+```bash
+forecast-elicitation web --no-open
+```
+
+Then open `http://127.0.0.1:8765/`. The preview provides a chat-style interface, a CSV/JSON/Excel/Parquet upload button, a plain-language requirements view, and catalog recommendations with dataset selection and fetching. The web UI uses the persistent provider conversation and never displays API traces. The API key stays in the backend process; do not put it in browser code.
+
+For the current FYP demonstration, host the UI and Python API together as one private service with persistent storage for SQLite, uploaded files, cached datasets, and the JSONL pipeline log. A later production deployment can split these responsibilities into a web client, a Python API service, managed database, and object storage, but the browser must still call the API rather than the OpenAI service directly.
+
+## Intermediate Interview Boundary
+
+The interview runs in an intermediate stage. It ranks at most twelve unresolved high-priority requirements for the provider and asks only what is needed for a useful brief: the forecast target, data source, forecast horizon, output grouping, and target unit. When the user supplies a file, data timing, data shape, provider, and privacy details can be checked from that file. When the user chooses the catalog, those dataset facts stay deferred until a catalog item has been selected and inspected.
+
+For the catalog path, choosing the catalog is only a source choice. Before a catalog dataset has been selected and its schema inspected, the interview does not ask for column names, item identifiers, hierarchy levels, or other dataset-shape details. It completes and confirms the forecasting brief first, then dataset discovery and explicit dataset selection happen. After the selected dataset makes its columns available through `set_dataset_columns()`, the deferred dataset questions become eligible.
+
+If the user asks what a question means, the application explains that specific question in simple language, repeats it with an example answer, and does not send that clarification message to the extractor or modify any slot.
+
+Once that core brief is valid, the assistant presents a plain-language summary and asks for confirmation. Advanced choices such as covariates, detailed missing-value policies, model evaluation strategy, and privacy restrictions remain recorded as deferred slots instead of generating a long interview. The confirmed specification preserves those deferred slot IDs for later pipeline stages.
 
 After `/confirm`, the CLI prints up to three eligible dataset recommendations. Discovery can also be run separately for a previously confirmed dialogue:
 

@@ -9,4 +9,5 @@ __pycache__/
 .env
 elicitation.db
 dataset_store/
+logs/*.jsonl
 evaluation/results/

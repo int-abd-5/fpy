@@ -106,6 +106,23 @@ def test_extractor_confirmed_status_is_downgraded_without_user_confirmation() ->
     assert not updated.slots["forecast_type"].confirmed_by_user
 
 
+def test_valid_value_is_not_left_invalid_when_extractor_mislabels_it() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+
+    updated = apply_extraction(
+        state,
+        _result("frequency", "1 minute", status=SlotStatus.INVALID),
+        schema,
+        1,
+        "1 minute",
+    )
+
+    assert updated.slots["frequency"].value == {"periods": 1.0, "unit": "minute"}
+    assert updated.slots["frequency"].status == SlotStatus.PROVIDED
+    assert updated.slots["frequency"].validation_errors == []
+
+
 def test_unknown_slot_update_is_rejected() -> None:
     schema = load_schema()
     state = create_initial_state(schema)
@@ -176,6 +193,116 @@ def test_evidence_matching_is_case_insensitive_and_records_provenance() -> None:
     assert slot.evidence_text == "point"
     assert slot.source_turn == 4
     assert slot.confidence == 0.72
+
+
+def test_unmentioned_pending_update_does_not_discard_other_valid_updates() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    result = ExtractorResult(
+        intent=Intent.CREATE_FORECAST,
+        intent_confidence=0.9,
+        updates=[
+            SlotUpdate(
+                slot_id="source_mode",
+                candidate_value="unmentioned",
+                status=SlotStatus.UNMENTIONED,
+                confidence=0.9,
+                evidence_text="",
+            ),
+            SlotUpdate(
+                slot_id="geography",
+                candidate_value="Pakistan",
+                status=SlotStatus.PROVIDED,
+                confidence=0.95,
+                evidence_text="Pakistan",
+            ),
+            SlotUpdate(
+                slot_id="forecast_horizon",
+                candidate_value="5 years",
+                status=SlotStatus.PROVIDED,
+                confidence=0.9,
+                evidence_text="5 years",
+            ),
+        ],
+    )
+
+    updated = apply_extraction(
+        state,
+        result,
+        schema,
+        1,
+        "I want to predict the inflation in Pakistan over the next 5 years",
+    )
+
+    assert updated.intent == Intent.CREATE_FORECAST
+    assert updated.slots["source_mode"].status == SlotStatus.UNMENTIONED
+    assert updated.slots["geography"].value == ["Pakistan"]
+    assert updated.slots["forecast_horizon"].value == {"periods": 5.0, "unit": "year"}
+
+
+def test_wrapped_extractor_evidence_is_canonicalized_to_user_text() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    result = ExtractorResult(
+        intent=Intent.CREATE_FORECAST,
+        intent_confidence=0.9,
+        updates=[
+            SlotUpdate(
+                slot_id="problem_statement",
+                candidate_value="Predict inflation in Pakistan over the next 5 years",
+                status=SlotStatus.PROVIDED,
+                confidence=0.95,
+                evidence_text=(
+                    'user message: "i want to predict the inflation in Pakistan over the next 5 years"'
+                ),
+            ),
+            SlotUpdate(
+                slot_id="geography",
+                candidate_value="Pakistan",
+                status=SlotStatus.PROVIDED,
+                confidence=0.95,
+                evidence_text='user message: "...inflation in Pakistan..."',
+            ),
+        ],
+    )
+
+    updated = apply_extraction(
+        state,
+        result,
+        schema,
+        1,
+        "I want to predict the inflation in Pakistan over the next 5 years",
+    )
+
+    assert updated.slots["problem_statement"].value.startswith("Predict inflation")
+    assert updated.slots["problem_statement"].evidence_text == (
+        "I want to predict the inflation in Pakistan over the next 5 years"
+    )
+    assert updated.slots["geography"].value == ["Pakistan"]
+
+
+def test_context_echo_is_not_accepted_as_user_evidence() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    result = ExtractorResult(
+        intent=Intent.AMBIGUOUS,
+        intent_confidence=0.75,
+        updates=[
+            SlotUpdate(
+                slot_id="intent",
+                candidate_value="create_forecast",
+                status=SlotStatus.AMBIGUOUS,
+                confidence=0.6,
+                evidence_text=(
+                    'latest_assistant_question: "Please answer the question using one of the choices described." '
+                    'pending_slot: {"slot_id":"intent"} current_message: "our data list"'
+                ),
+            )
+        ],
+    )
+
+    with pytest.raises(UnsupportedEvidenceError):
+        apply_extraction(state, result, schema, 2, "our data list")
 
 
 @pytest.mark.parametrize("evidence", ["", "   ", "weekly"])
@@ -321,7 +448,8 @@ def test_evidence_must_be_from_current_message_only_and_failure_is_atomic() -> N
         ],
     )
 
-    with pytest.raises(UnsupportedEvidenceError):
-        apply_extraction(state, result, schema, 2, "daily point forecast")
+    updated = apply_extraction(state, result, schema, 2, "daily point forecast")
 
     assert state == before
+    assert updated.slots["frequency"].value == {"periods": 1.0, "unit": "day"}
+    assert updated.slots["forecast_type"].value is None

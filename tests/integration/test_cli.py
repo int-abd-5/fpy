@@ -1,16 +1,19 @@
+import asyncio
 from uuid import UUID
 
 from typer.testing import CliRunner
 
-from forecasting_assistant.config import get_settings
+from forecasting_assistant.config import Settings, get_settings
 from forecasting_assistant.domain.models import (
     ForecastingSpecification,
     Intent,
     ReadinessReport,
     TurnResult,
 )
-from forecasting_assistant.infrastructure.persistence.sqlite_repository import SQLiteDialogueRepository
 from forecasting_assistant.domain.schema import create_initial_state, load_schema
+from forecasting_assistant.infrastructure.persistence.sqlite_repository import (
+    SQLiteDialogueRepository,
+)
 from forecasting_assistant.interfaces import cli
 
 
@@ -78,6 +81,43 @@ def test_interview_prints_one_message_per_turn_and_final_json(monkeypatch) -> No
     assert engine.messages == ["Forecast monthly sales for the next year using sales.xlsx."]
 
 
+def test_catalog_confirmation_starts_dataset_recommendation_handoff(monkeypatch) -> None:
+    class CatalogEngine(FakeEngine):
+        async def handle_user_message(self, dialogue_id: UUID, message: str) -> TurnResult:
+            result = await super().handle_user_message(dialogue_id, message)
+            return result.model_copy(
+                update={"specification": self.confirm_specification(dialogue_id, confirm=True)}
+            )
+
+        def confirm_specification(
+            self, dialogue_id: UUID, *, confirm: bool
+        ) -> ForecastingSpecification:
+            specification = super().confirm_specification(dialogue_id, confirm=confirm)
+            specification.values["source_mode"] = "catalog"
+            return specification
+
+    class DatasetService:
+        def __init__(self) -> None:
+            self.specification = None
+
+        def discover_for_specification(self, specification):
+            self.specification = specification
+            return object()
+
+    engine = CatalogEngine()
+    service = DatasetService()
+    monkeypatch.setattr(cli, "build_engine", lambda: engine)
+    monkeypatch.setattr(cli, "build_dataset_service", lambda: (service, None))
+    monkeypatch.setattr(cli, "_render_source_plan", lambda plan: "catalog recommendations")
+
+    result = CliRunner().invoke(cli.app, ["interview"], input="request\nyes\n")
+
+    assert result.exit_code == 0
+    assert service.specification is not None
+    assert "Dataset recommendations" in result.output
+    assert "catalog recommendations" in result.output
+
+
 def test_show_and_quit_do_not_call_provider(monkeypatch) -> None:
     engine = FakeEngine()
     monkeypatch.setattr(cli, "build_engine", lambda: engine)
@@ -87,6 +127,48 @@ def test_show_and_quit_do_not_call_provider(monkeypatch) -> None:
     assert result.exit_code == 0
     assert str(engine.state.dialogue_id) in result.output
     assert engine.messages == []
+
+
+def test_persistent_interview_selects_persistent_provider_mode(monkeypatch) -> None:
+    engine = FakeEngine()
+    captured: dict[str, object] = {}
+
+    def build_persistent_engine(**kwargs):
+        captured.update(kwargs)
+        return engine
+
+    monkeypatch.setattr(cli, "build_engine", build_persistent_engine)
+
+    result = CliRunner().invoke(cli.app, ["persistent-interview", "--trace"], input="/quit\n")
+
+    assert result.exit_code == 0
+    assert captured == {"persistent": True}
+    assert "Persistent provider context is enabled" not in result.output
+    assert "[trace]" not in result.output
+
+
+def test_interview_uses_one_asyncio_loop_for_all_turns(monkeypatch) -> None:
+    class LoopAwareEngine(FakeEngine):
+        def __init__(self) -> None:
+            super().__init__()
+            self.loop_ids: list[int] = []
+
+        async def handle_user_message(self, dialogue_id: UUID, message: str) -> TurnResult:
+            self.loop_ids.append(id(asyncio.get_running_loop()))
+            return await super().handle_user_message(dialogue_id, message)
+
+    engine = LoopAwareEngine()
+    monkeypatch.setattr(cli, "build_engine", lambda **kwargs: engine)
+
+    result = CliRunner().invoke(
+        cli.app,
+        ["persistent-interview"],
+        input="first turn\nsecond turn\n/quit\n",
+    )
+
+    assert result.exit_code == 0
+    assert len(engine.loop_ids) == 2
+    assert len(set(engine.loop_ids)) == 1
 
 
 def test_seed_world_bank_demo_creates_confirmed_trusted_source_spec(tmp_path) -> None:
@@ -118,3 +200,22 @@ def test_dataset_service_does_not_require_openai_key(monkeypatch, tmp_path) -> N
         cli.build_dataset_service()
     finally:
         get_settings.cache_clear()
+
+
+def test_build_engine_wires_the_persistent_pipeline_logger(monkeypatch, tmp_path) -> None:
+    log_path = tmp_path / "logs" / "pipeline.jsonl"
+    settings = Settings(
+        _env_file=None,
+        openai_api_key="test-key",
+        openai_model="test-model",
+        elicitation_db_path=str(tmp_path / "dialogue.db"),
+        elicitation_log_path=str(log_path),
+    )
+    monkeypatch.setattr(cli, "get_settings", lambda: settings)
+
+    engine = cli.build_engine()
+    engine._llm._trace("test.pipeline_stage", {"api_key": "secret-value"})
+
+    contents = log_path.read_text(encoding="utf-8")
+    assert "test.pipeline_stage" in contents
+    assert "secret-value" not in contents

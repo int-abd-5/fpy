@@ -42,7 +42,15 @@ def test_normalization_handles_schema_value_types() -> None:
     assert normalize_value(schema.get("forecast_type"), " Point ") == "point"
     assert normalize_value(schema.get("source_mode"), "CSV") == "upload"
     assert normalize_value(schema.get("source_mode"), "uploaded") == "upload"
+    assert normalize_value(schema.get("source_mode"), "choose from your data list") == "catalog"
+    assert normalize_value(schema.get("source_mode"), "from our data list") == "catalog"
+    assert normalize_value(schema.get("source_mode"), "our data list") == "catalog"
+    assert normalize_value(schema.get("source_mode"), "your data list") == "catalog"
+    assert normalize_value(schema.get("source_mode"), "our daat list") == "catalog"
+    assert normalize_value(schema.get("source_mode"), "connect to an online service") == "api"
     assert normalize_value(schema.get("dataset_type"), "single_time_series") == "single_series"
+    assert normalize_value(schema.get("dataset_type"), "several separate items") == "panel"
+    assert normalize_value(schema.get("dataset_type"), "several seperate items") == "panel"
     assert normalize_value(schema.get("known_seasonality"), "YES") is True
     assert normalize_value(schema.get("prediction_interval_levels"), [80, "95"]) == [80.0, 95.0]
     assert normalize_value(schema.get("seasonal_periods"), "7, 12") == [7, 12]
@@ -60,6 +68,8 @@ def test_normalization_handles_schema_value_types() -> None:
         ("10 days", {"periods": 10.0, "unit": "day"}),
         ("the following week", {"periods": 1.0, "unit": "week"}),
         ("monthly", {"periods": 1.0, "unit": "month"}),
+        ("once every minute", {"periods": 1.0, "unit": "minute"}),
+        ("every minute", {"periods": 1.0, "unit": "minute"}),
     ],
 )
 def test_normalization_converts_natural_language_durations(
@@ -80,6 +90,38 @@ def test_invalid_timezone_is_a_validation_issue_not_exception() -> None:
     issue = validate_slot(load_schema().get("timezone"), _slot("timezone", "Mars/Olympus"))[0]
 
     assert issue.code == "iana_timezone"
+
+
+@pytest.mark.parametrize(
+    ("slot_id", "value"),
+    [
+        ("target_column", "no dataset"),
+        ("time_column", "not available"),
+        ("series_id_columns", ["yes"]),
+        ("hierarchy_columns", ["the system will fetch it"]),
+        ("source_reference", "the system will fetch it"),
+    ],
+)
+def test_rejects_non_answers_for_dataset_or_source_fields(slot_id: str, value: object) -> None:
+    issues = validate_slot(load_schema().get(slot_id), _slot(slot_id, value))
+
+    assert any(issue.code == "unusable_reference" for issue in issues)
+
+
+def test_known_dataset_columns_reject_unknown_column_references() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+    state.dataset_columns = ["date", "close", "volume"]
+    state.slots["target_column"] = _slot("target_column", "price")
+    state.slots["time_column"] = _slot("time_column", "date")
+
+    issues = validate_dialogue(schema, state)
+
+    assert any(
+        issue.slot_id == "target_column" and issue.code == "dataset_column_not_found"
+        for issue in issues
+    )
+    assert not any(issue.slot_id == "time_column" for issue in issues)
 
 
 def test_invalid_datetime_text_is_a_validation_issue() -> None:

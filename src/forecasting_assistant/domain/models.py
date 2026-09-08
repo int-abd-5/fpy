@@ -98,6 +98,8 @@ class DialogueState(BaseModel):
     turns: list[DialogueTurn] = Field(default_factory=list)
     confirmed: bool = False
     schema_version: str = "1.0.0"
+    dataset_columns: list[str] = Field(default_factory=list)
+    provider_conversation_id: str | None = None
 
 
 class ValidationIssue(BaseModel):
@@ -115,14 +117,21 @@ class ReadinessReport(BaseModel):
 
 
 class QuestionRequest(BaseModel):
+    dialogue_id: UUID | None = Field(default=None, exclude=True)
+    provider_conversation_id: str | None = Field(default=None, exclude=True)
     slot_id: str
     reason: str
     slot_description: str
     current_state: SlotState
     confirmed_context: dict[str, Any]
+    known_context: dict[str, Any] = Field(default_factory=dict)
     static_question: str
     allowed_values: tuple[str, ...] = ()
     other_active_slot_ids: tuple[str, ...] = ()
+    example_answer: str | None = None
+    available_dataset_columns: tuple[str, ...] = ()
+    priority_slots: tuple[dict[str, Any], ...] = ()
+    interview_stage: str = "intermediate"
 
 
 class QuestionOutput(BaseModel):
@@ -145,4 +154,5 @@ class ForecastingSpecification(BaseModel):
     confirmed_inferred_slots: list[str]
     documented_defaults: dict[str, Any]
     unresolved_optional_slots: list[str]
+    deferred_slots: list[str] = Field(default_factory=list)
     confirmed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

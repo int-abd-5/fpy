@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import re
 
 from forecasting_assistant.application.normalization import normalize_value
 from forecasting_assistant.application.validation import validate_slot
@@ -26,19 +27,101 @@ class UnsupportedEvidenceError(ValueError):
         self.evidence_text = evidence_text
 
 
+_FORECAST_TERM_PATTERN = re.compile(
+    r"\b(?:forecast(?:ing)?|predict(?:ion|ed|ing)?|project(?:ion|ed|ing)?|"
+    r"estimate(?:d|s|ing)?|time[- ]series)\b",
+    re.IGNORECASE,
+)
+_EXPLICIT_FORECAST_REQUEST_PATTERN = re.compile(
+    r"\b(?:i|we)\s+(?:want|need|would like|am looking to|am looking for)\b"
+    r".{0,100}\b(?:forecast|predict(?:ion|ed|ing)?|project(?:ion|ed|ing)?|"
+    r"estimate(?:d|s|ing)?|time[- ]series)\b",
+    re.IGNORECASE,
+)
+
+
 def _check_contract(
     state: DialogueState,
     result: ExtractorResult,
     schema: ForecastingSchema,
     current_message: str,
-) -> None:
+) -> list[SlotUpdate]:
     message = current_message.casefold()
     schema_slot_ids = {slot.slot_id for slot in schema.slots}
+    valid_updates: list[SlotUpdate] = []
+    invalid_evidence: str | None = None
     for update in result.updates:
         if update.slot_id not in state.slots or update.slot_id not in schema_slot_ids:
             raise UnknownSlotError(update.slot_id)
-        if not update.evidence_text.strip() or update.evidence_text.casefold() not in message:
-            raise UnsupportedEvidenceError(update.evidence_text)
+        if update.status in {SlotStatus.UNMENTIONED, SlotStatus.DONT_CARE}:
+            continue
+        evidence = _canonical_evidence(update, current_message, message)
+        if evidence is None:
+            invalid_evidence = invalid_evidence or update.evidence_text
+            continue
+        valid_updates.append(update.model_copy(update={"evidence_text": evidence}))
+    if invalid_evidence is not None and not valid_updates:
+        raise UnsupportedEvidenceError(invalid_evidence)
+    return valid_updates
+
+
+def _canonical_evidence(
+    update: SlotUpdate, current_message: str, folded_message: str
+) -> str | None:
+    evidence = update.evidence_text.strip()
+    if not evidence:
+        return None
+
+    if evidence and evidence.casefold() in folded_message:
+        return evidence
+
+    quoted_message = re.search(r"user message:\s*[\"'](?P<text>.*?)[\"']\s*$", evidence, re.IGNORECASE)
+    if quoted_message is not None:
+        snippet = quoted_message.group("text").strip()
+        compact = re.sub(r"\.{3,}", "", snippet).strip()
+        if compact and compact.casefold() in folded_message:
+            return current_message
+
+    candidate = update.candidate_value
+    if (
+        ("user message" in evidence.casefold() or "..." in evidence)
+        and isinstance(candidate, str)
+        and candidate.strip()
+        and candidate.casefold() in folded_message
+    ):
+        return candidate.strip()
+    return None
+
+
+def _resolved_intent(
+    state: DialogueState,
+    result: ExtractorResult,
+    valid_updates: list[SlotUpdate],
+    current_message: str,
+) -> Intent:
+    if state.intent == Intent.CREATE_FORECAST or result.intent == Intent.CREATE_FORECAST:
+        return Intent.CREATE_FORECAST
+    if result.intent in {Intent.NOT_FORECASTING, Intent.UNSUPPORTED}:
+        return result.intent
+
+    existing_intent = state.slots["intent"]
+    if (
+        existing_intent.value == Intent.CREATE_FORECAST.value
+        and existing_intent.status not in {SlotStatus.INVALID, SlotStatus.CONFLICTING}
+    ):
+        return Intent.CREATE_FORECAST
+
+    forecast_statements = [
+        str(update.candidate_value)
+        for update in valid_updates
+        if update.slot_id == "problem_statement"
+        and update.status in {SlotStatus.PROVIDED, SlotStatus.INFERRED, SlotStatus.CONFIRMED}
+    ]
+    has_forecast_statement = any(_FORECAST_TERM_PATTERN.search(value) for value in forecast_statements)
+    has_explicit_request = _EXPLICIT_FORECAST_REQUEST_PATTERN.search(current_message) is not None
+    if result.intent == Intent.AMBIGUOUS and (has_forecast_statement or has_explicit_request):
+        return Intent.CREATE_FORECAST
+    return result.intent
 
 
 def _apply_update(
@@ -78,7 +161,7 @@ def _apply_update(
     elif (
         definition.value_type == "duration"
         and isinstance(normalized, dict)
-        and update.status == SlotStatus.AMBIGUOUS
+        and update.status in {SlotStatus.AMBIGUOUS, SlotStatus.INVALID}
     ):
         current.status = SlotStatus.PROVIDED
 
@@ -90,15 +173,19 @@ def apply_extraction(
     turn_number: int,
     current_message: str,
 ) -> DialogueState:
-    _check_contract(state, result, schema, current_message)
+    valid_updates = _check_contract(state, result, schema, current_message)
     updated_state = deepcopy(state)
-    updated_state.intent = result.intent
-    for update in result.updates:
+    resolved_intent = _resolved_intent(state, result, valid_updates, current_message)
+    forecasting_intent_locked = state.intent == Intent.CREATE_FORECAST
+    updated_state.intent = resolved_intent
+    for update in valid_updates:
         _apply_update(updated_state, result, update, schema, turn_number)
-    if result.intent == Intent.CREATE_FORECAST:
+    if forecasting_intent_locked:
+        updated_state.slots["intent"] = deepcopy(state.slots["intent"])
+    elif resolved_intent == Intent.CREATE_FORECAST:
         intent_slot = updated_state.slots["intent"]
         intent_update = next(
-            (update for update in result.updates if update.slot_id == "intent"),
+            (update for update in valid_updates if update.slot_id == "intent"),
             None,
         )
         intent_slot.value = Intent.CREATE_FORECAST.value

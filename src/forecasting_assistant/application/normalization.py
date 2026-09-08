@@ -1,10 +1,9 @@
-from datetime import datetime
 import re
+from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from forecasting_assistant.domain.schema import SlotDefinition
-
 
 _DURATION_UNITS = {
     "second": "second",
@@ -58,6 +57,18 @@ _ENUM_ALIASES = {
         "warehouse": "database",
         "catalog": "catalog",
         "catalogue": "catalog",
+        "choose_from_your_data_list": "catalog",
+        "from_our_data_list": "catalog",
+        "from_your_data_list": "catalog",
+        "our_data_list": "catalog",
+        "your_data_list": "catalog",
+        "our_daat_list": "catalog",
+        "data_list": "catalog",
+        "data_catalog": "catalog",
+        "from_catalog": "catalog",
+        "use_catalog": "catalog",
+        "online_service": "api",
+        "connect_to_an_online_service": "api",
     },
     "dataset_type": {
         "single": "single_series",
@@ -69,8 +80,12 @@ _ENUM_ALIASES = {
         "panel": "panel",
         "multiple_series": "panel",
         "multi_series": "panel",
+        "several_separate_items": "panel",
+        "several_seperate_items": "panel",
+        "separate_items": "panel",
         "hierarchical": "hierarchical",
         "hierarchy": "hierarchical",
+        "groups_with_levels": "hierarchical",
     },
 }
 
@@ -82,7 +97,14 @@ def _items(value: Any) -> list[Any]:
 
 
 def _duration_from_text(value: str) -> dict[str, Any] | None:
-    match = _DURATION_TEXT_PATTERN.fullmatch(value)
+    normalized = " ".join(value.strip().split())
+    normalized = re.sub(
+        r"^(?:once\s+)?(?:every|each|per)\s+",
+        "",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    match = _DURATION_TEXT_PATTERN.fullmatch(normalized)
     if match is None:
         return None
     unit = _DURATION_UNITS.get(match.group("unit").lower())
@@ -114,7 +136,20 @@ def _normalize_enum_value(definition: SlotDefinition, value: Any) -> str:
             return "api"
         if any(term in key for term in ("database", "db", "sql", "warehouse", "postgres", "mysql", "sqlite", "bigquery", "snowflake")):
             return "database"
-        if any(term in key for term in ("catalog", "catalogue", "registry")):
+        catalog_phrases = (
+            "catalog",
+            "catalogue",
+            "registry",
+            "data_list",
+            "dataset_list",
+            "system_data",
+            "our_data",
+            "your_data",
+            "fetch_the_data",
+            "find_the_data",
+            "get_the_data",
+        )
+        if any(term in key for term in catalog_phrases):
             return "catalog"
 
     if definition.slot_id == "dataset_type":

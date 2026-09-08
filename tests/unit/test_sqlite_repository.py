@@ -29,6 +29,19 @@ def test_state_round_trip_preserves_schema_and_turns(
     assert loaded.schema_version == "1.0.0"
 
 
+def test_state_round_trip_preserves_provider_conversation_id(
+    repository: SQLiteDialogueRepository,
+) -> None:
+    state = create_initial_state(load_schema())
+    state.provider_conversation_id = "conv_saved_456"
+
+    repository.save_state(state)
+
+    loaded = repository.load_state(state.dialogue_id)
+
+    assert loaded.provider_conversation_id == "conv_saved_456"
+
+
 def test_events_are_append_only_and_round_trip(repository: SQLiteDialogueRepository) -> None:
     state = create_initial_state(load_schema())
     repository.save_state(state)
