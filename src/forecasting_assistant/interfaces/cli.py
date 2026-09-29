@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from collections.abc import Callable
 from typing import Any
 from uuid import UUID
@@ -107,13 +108,17 @@ def _world_bank_demo_values() -> dict[str, object]:
 
 def build_dataset_service() -> tuple[DatasetDiscoveryService, SQLiteDialogueRepository]:
     settings = get_settings()
+    if settings.registry_required and not settings.registry_api_url.strip():
+        raise typer.BadParameter(
+            "REGISTRY_API_URL is required when REGISTRY_REQUIRED is enabled"
+        )
     dialogue_repository = SQLiteDialogueRepository(settings.elicitation_db_path)
     dialogue_repository.initialize()
     catalog_repository = SQLiteDatasetCatalogRepository(settings.elicitation_db_path)
     catalog_repository.initialize()
     http = SecureHttpClient()
     service = DatasetDiscoveryService(
-        build_default_adapters(http),
+        build_default_adapters(http, settings=settings),
         catalog_repository,
         ContentAddressedObjectStore(settings.dataset_store_path),
     )
@@ -339,11 +344,17 @@ def fetch_dataset(
 
 @app.command()
 def web(
-    host: str = typer.Option("127.0.0.1", "--host", help="Host for the local web UI."),
-    port: int = typer.Option(8765, "--port", help="Port for the local web UI."),
+    host: str | None = typer.Option(None, "--host", help="Host for the web UI."),
+    port: int | None = typer.Option(None, "--port", help="Port for the web UI."),
     open_browser: bool = typer.Option(True, "--open/--no-open", help="Open the browser automatically."),
 ) -> None:
-    """Run the local web demo interface."""
+    """Run the web interface; PORT is used automatically when provided by Render."""
     from forecasting_assistant.interfaces.web import run_web_server
 
-    run_web_server(host=host, port=port, open_browser=open_browser)
+    resolved_host = host or os.environ.get("WEB_HOST", "127.0.0.1")
+    raw_port = port if port is not None else os.environ.get("PORT", "8765")
+    try:
+        resolved_port = int(raw_port)
+    except (TypeError, ValueError) as error:
+        raise typer.BadParameter("web port must be an integer") from error
+    run_web_server(host=resolved_host, port=resolved_port, open_browser=open_browser)

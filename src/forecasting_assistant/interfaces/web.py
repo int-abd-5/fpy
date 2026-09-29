@@ -24,6 +24,10 @@ from forecasting_assistant.domain.schema import load_schema
 from forecasting_assistant.infrastructure.datasets.http import SecureHttpClient
 from forecasting_assistant.infrastructure.datasets.object_store import ContentAddressedObjectStore
 from forecasting_assistant.infrastructure.datasets.registry import build_default_adapters
+from forecasting_assistant.infrastructure.datasets.registry_client import (
+    RegistryApiError,
+    RegistryClient,
+)
 from forecasting_assistant.infrastructure.datasets.sqlite_repository import (
     SQLiteDatasetCatalogRepository,
 )
@@ -193,7 +197,7 @@ def dashboard_html() -> str:
     <div class="header-actions"><button onclick="startDialogue()">New session</button></div>
   </header>
   <main>
-    <section>
+    <section class="chat-shell">
       <div class="section-head"><h2>Describe the forecast you need</h2><p>I’ll help you shape the request and find useful data.</p></div>
       <div id="chat" class="chat"></div>
       <div class="compose">
@@ -201,7 +205,7 @@ def dashboard_html() -> str:
         <div class="compose-actions"><label class="upload-label"><input id="fileInput" type="file" accept=".csv,.json,.xlsx,.xls,.parquet" onchange="uploadData(this.files[0])">↥ &nbsp;Upload data</label><span id="uploadStatus" class="meta"></span><button class="primary" onclick="sendMessage()">Send&nbsp; ↗</button></div>
       </div>
     </section>
-    <section>
+    <section class="insight-shell">
       <div class="tabs">
         <button class="active" onclick="tab('requirements')">Requirements</button>
         <button onclick="tab('catalog')">Data catalog</button>
@@ -361,6 +365,8 @@ resumeOrStart().catch(error => { panel.innerHTML = `<p class="error">${esc(error
 class DashboardServer:
     def __init__(self, host: str, port: int) -> None:
         self.settings = get_settings()
+        if self.settings.registry_required and not self.settings.registry_api_url.strip():
+            raise ValueError("REGISTRY_API_URL is required when REGISTRY_REQUIRED is enabled")
         schema = load_schema(self.settings.schema_version)
         repository = SQLiteDialogueRepository(self.settings.elicitation_db_path)
         repository.initialize()
@@ -379,15 +385,46 @@ class DashboardServer:
             repository,
             trace_sink=pipeline_sink,
         )
+        self.registry_client = (
+            RegistryClient(
+                self.settings.registry_api_url,
+                api_key=self.settings.registry_api_key,
+                timeout_seconds=self.settings.registry_timeout_seconds,
+                max_retries=self.settings.registry_max_retries,
+            )
+            if self.settings.registry_api_url.strip()
+            else None
+        )
         http = SecureHttpClient()
         self.catalog_repository = catalog_repository
         self.dataset_service = DatasetDiscoveryService(
-            build_default_adapters(http),
+            build_default_adapters(http, settings=self.settings),
             catalog_repository,
             ContentAddressedObjectStore(self.settings.dataset_store_path),
         )
         self.db_path = Path(self.settings.elicitation_db_path)
         self.server = ThreadingHTTPServer((host, port), self._handler_class())
+
+    def health_payload(self) -> tuple[dict[str, Any], HTTPStatus]:
+        registry = {
+            "configured": self.registry_client is not None,
+            "required": self.settings.registry_required,
+            "status": "not_configured",
+        }
+        if self.registry_client is not None:
+            try:
+                self.registry_client.health(timeout_seconds=min(self.settings.registry_timeout_seconds, 3.0))
+                registry["status"] = "ok"
+            except RegistryApiError:
+                registry["status"] = "unavailable"
+        required_failure = self.settings.registry_required and registry["status"] != "ok"
+        return (
+            {
+                "status": "unavailable" if required_failure else "ok",
+                "registry": registry,
+            },
+            HTTPStatus.SERVICE_UNAVAILABLE if required_failure else HTTPStatus.OK,
+        )
 
     def _store_upload(self, dialogue_id: UUID, filename: str, content: bytes) -> dict[str, Any]:
         if len(content) > _MAX_UPLOAD_BYTES:
@@ -453,6 +490,9 @@ class DashboardServer:
                     parts = [part for part in parsed.path.split("/") if part]
                     if parsed.path == "/":
                         self._send_html()
+                    elif parsed.path == "/healthz":
+                        payload, status = dashboard.health_payload()
+                        self._send_json(payload, status)
                     elif parts == ["api", "dialogues"]:
                         self._send_json({"rows": _list_table(dashboard.db_path, "dialogues", "updated_at")})
                     elif len(parts) == 3 and parts[:2] == ["api", "dialogues"]:
