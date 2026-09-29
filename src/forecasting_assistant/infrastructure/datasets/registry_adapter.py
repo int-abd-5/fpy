@@ -75,7 +75,9 @@ class RegistryDatasetAdapter:
             "min_companion_strength": self._settings.registry_min_companion_strength,
             "max_dependency_depth": self._settings.registry_max_dependency_depth,
             "max_sources": self._settings.registry_max_sources,
-            "include_pending": self._settings.registry_include_pending,
+            "include_pending": (
+                self._settings.registry_include_pending and not self._settings.registry_required
+            ),
         }
         if "." in target:
             payload["target"] = target

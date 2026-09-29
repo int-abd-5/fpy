@@ -148,6 +148,7 @@ def test_search_builds_explicit_resolve_payload_from_query() -> None:
         registry_max_dependency_depth=3,
         registry_max_sources=7,
         registry_include_pending=True,
+        registry_required=True,
     )
     adapter = RegistryDatasetAdapter(client, FakeHttp(), settings=settings)
 
@@ -169,7 +170,7 @@ def test_search_builds_explicit_resolve_payload_from_query() -> None:
             "min_companion_strength": 0.70,
             "max_dependency_depth": 3,
             "max_sources": 7,
-            "include_pending": True,
+            "include_pending": False,
         }
     ]
 

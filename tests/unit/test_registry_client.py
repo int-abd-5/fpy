@@ -9,6 +9,7 @@ from forecasting_assistant.infrastructure.datasets.registry_client import (
     RegistryApiError,
     RegistryClient,
     RegistryResponse,
+    RegistryUnavailableError,
 )
 
 
@@ -156,3 +157,20 @@ def test_registry_api_key_is_sent_as_bearer_without_being_exposed_in_errors() ->
 def test_non_local_http_registry_url_is_rejected() -> None:
     with pytest.raises(ValueError, match="must use HTTPS"):
         RegistryClient("http://10.0.0.5")
+
+
+def test_health_can_disable_retries_for_fast_platform_probes() -> None:
+    transport = FakeTransport([TimeoutError("temporary timeout")])
+    sleeps: list[float] = []
+    client = RegistryClient(
+        "https://registry.example.com",
+        transport=transport,
+        max_retries=3,
+        sleeper=sleeps.append,
+    )
+
+    with pytest.raises(RegistryUnavailableError):
+        client.health(retry=False)
+
+    assert len(transport.calls) == 1
+    assert sleeps == []

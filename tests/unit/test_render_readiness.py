@@ -14,12 +14,22 @@ class HealthyRegistryClient:
         self.args = args
         self.kwargs = kwargs
 
-    def health(self, *, timeout_seconds: float | None = None) -> dict[str, object]:
+    def health(
+        self,
+        *,
+        timeout_seconds: float | None = None,
+        retry: bool = True,
+    ) -> dict[str, object]:
         return {"status": "ok", "db_ok": True}
 
 
 class UnavailableRegistryClient(HealthyRegistryClient):
-    def health(self, *, timeout_seconds: float | None = None) -> dict[str, object]:
+    def health(
+        self,
+        *,
+        timeout_seconds: float | None = None,
+        retry: bool = True,
+    ) -> dict[str, object]:
         raise RegistryUnavailableError("registry API could not be reached")
 
 

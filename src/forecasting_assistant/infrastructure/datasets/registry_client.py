@@ -99,8 +99,18 @@ class RegistryClient:
         self._transport = transport or _UrllibRegistryTransport()
         self._sleeper = sleeper
 
-    def health(self, *, timeout_seconds: float | None = None) -> dict[str, Any]:
-        payload = self._request("GET", "/healthz", timeout_seconds=timeout_seconds)
+    def health(
+        self,
+        *,
+        timeout_seconds: float | None = None,
+        retry: bool = True,
+    ) -> dict[str, Any]:
+        payload = self._request(
+            "GET",
+            "/healthz",
+            timeout_seconds=timeout_seconds,
+            max_retries=None if retry else 0,
+        )
         if "status" not in payload or "db_ok" not in payload:
             raise RegistryApiError("registry health response has an invalid shape")
         if payload.get("status") != "ok":
@@ -128,13 +138,15 @@ class RegistryClient:
         *,
         payload: dict[str, Any] | None = None,
         timeout_seconds: float | None = None,
+        max_retries: int | None = None,
     ) -> dict[str, Any]:
         request_payload = None if payload is None else _clean_payload(payload)
         headers = {"Accept": "application/json", "Content-Type": "application/json"}
         if self._api_key:
             headers["Authorization"] = f"Bearer {self._api_key}"
         timeout = timeout_seconds or self._timeout_seconds
-        for attempt in range(self._max_retries + 1):
+        retries = self._max_retries if max_retries is None else max_retries
+        for attempt in range(retries + 1):
             try:
                 response = self._transport.request(
                     method,
@@ -144,12 +156,12 @@ class RegistryClient:
                     timeout_seconds=timeout,
                 )
             except (RegistryUnavailableError, OSError, TimeoutError) as error:
-                if attempt < self._max_retries:
+                if attempt < retries:
                     self._sleeper(2.0**attempt)
                     continue
                 raise RegistryUnavailableError("registry API could not be reached") from error
             if response.status_code >= 500:
-                if attempt < self._max_retries:
+                if attempt < retries:
                     self._sleeper(2.0**attempt)
                     continue
                 raise RegistryUnavailableError(

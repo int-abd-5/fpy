@@ -413,7 +413,10 @@ class DashboardServer:
         }
         if self.registry_client is not None:
             try:
-                self.registry_client.health(timeout_seconds=min(self.settings.registry_timeout_seconds, 3.0))
+                self.registry_client.health(
+                    timeout_seconds=min(self.settings.registry_timeout_seconds, 3.0),
+                    retry=False,
+                )
                 registry["status"] = "ok"
             except RegistryApiError:
                 registry["status"] = "unavailable"
