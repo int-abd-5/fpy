@@ -66,6 +66,9 @@ ELICITATION_DB_PATH=elicitation.db
 ELICITATION_LOG_PATH=logs/elicitation_pipeline.jsonl
 SCHEMA_VERSION=1.0.0
 PROMPT_VERSION=llmrei-long-forecasting-v1
+REGISTRY_API_URL=
+REGISTRY_API_KEY=
+REGISTRY_REQUIRED=false
 ```
 
 The model remains configurable. Automated tests use injected fakes and never require a network connection or API key.
@@ -127,6 +130,70 @@ forecast-elicitation web --no-open
 Then open `http://127.0.0.1:8765/`. The preview provides a chat-style interface, a CSV/JSON/Excel/Parquet upload button, a plain-language requirements view, and catalog recommendations with dataset selection and fetching. The web UI uses the persistent provider conversation and never displays API traces. The API key stays in the backend process; do not put it in browser code.
 
 For the current FYP demonstration, host the UI and Python API together as one private service with persistent storage for SQLite, uploaded files, cached datasets, and the JSONL pipeline log. A later production deployment can split these responsibilities into a web client, a Python API service, managed database, and object storage, but the browser must still call the API rather than the OpenAI service directly.
+
+### Remote data registry
+
+The FYP does not connect directly to the registry database. It calls the separately hosted registry API and uses the registry's verified source metadata and returned endpoint URLs:
+
+```text
+confirmed forecasting specification
+  -> GET /healthz on the registry
+  -> POST /resolve
+  -> verified target sources and companion metadata
+  -> secure fetch of each returned endpoint_url
+  -> existing dataset validation and cache
+```
+
+To use the registry locally, start that separate service and set:
+
+```dotenv
+REGISTRY_API_URL=http://127.0.0.1:8000
+REGISTRY_REQUIRED=true
+```
+
+The registry API may be local HTTP for development. Dataset endpoint URLs returned by it must still satisfy the FYP's secure downloader rules. In production, use the registry's HTTPS Render URL and keep `REGISTRY_INCLUDE_PENDING=false`.
+
+### Deploy the FYP web service on Render
+
+The repository includes a FYP-only `render.yaml`. It does not create or manage the registry service or its database.
+
+Manual Render setup:
+
+1. Deploy the dataset registry separately and copy its public HTTPS service URL, for example `https://your-registry-service.onrender.com`.
+2. Create a Render Web Service for this repository, using the repository's default branch.
+3. Set the build command to `pip install .`.
+4. Set the start command to:
+
+   ```bash
+   forecast-elicitation web --host 0.0.0.0 --port $PORT --no-open
+   ```
+
+5. Set the health-check path to `/healthz`.
+6. Add these environment variables in Render:
+
+   ```text
+   OPENAI_API_KEY=<your OpenAI key>
+   OPENAI_MODEL=gpt-4.1-mini
+   REGISTRY_API_URL=https://your-registry-service.onrender.com
+   REGISTRY_REQUIRED=true
+   ELICITATION_DB_PATH=/var/data/elicitation.db
+   ELICITATION_LOG_PATH=/var/data/logs/elicitation_pipeline.jsonl
+   DATASET_STORE_PATH=/var/data/dataset_store
+   ```
+
+   Add `REGISTRY_API_KEY` only if the separately deployed registry is configured to require one. Keep all keys as secret environment values.
+
+7. Attach a persistent disk mounted at `/var/data` if the FYP should retain its SQLite state, uploads, cached datasets, and pipeline logs between deployments. The included Blueprint describes this disk. A multi-instance deployment should move shared state to an external database and object storage instead of relying on local SQLite/files.
+8. Deploy and verify both services:
+
+   ```bash
+   curl https://your-fyp-service.onrender.com/healthz
+   curl https://your-registry-service.onrender.com/healthz
+   ```
+
+   The FYP health response reports whether the registry is configured and available without exposing either API key. A required registry outage returns HTTP 503 so the deployment does not silently use unrelated catalog data.
+
+Blueprint setup can be used by selecting this repository's `render.yaml` in Render. Review the environment values and persistent-disk plan before creating the service. The registry remains a separate deployment and is referenced only through `REGISTRY_API_URL`.
 
 ## Intermediate Interview Boundary
 

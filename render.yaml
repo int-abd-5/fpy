@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: forecast-studio
+    runtime: python
+    buildCommand: pip install .
+    startCommand: forecast-elicitation web --host 0.0.0.0 --port $PORT --no-open
+    healthCheckPath: /healthz
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini
+      - key: REGISTRY_API_URL
+        sync: false
+      - key: REGISTRY_API_KEY
+        sync: false
+      - key: REGISTRY_REQUIRED
+        value: "true"
+      - key: ELICITATION_DB_PATH
+        value: /var/data/elicitation.db
+      - key: ELICITATION_LOG_PATH
+        value: /var/data/logs/elicitation_pipeline.jsonl
+      - key: DATASET_STORE_PATH
+        value: /var/data/dataset_store
+      - key: SCHEMA_VERSION
+        value: 1.0.0
+      - key: PROMPT_VERSION
+        value: llmrei-long-forecasting-v1
+      - key: REGISTRY_TIMEOUT_SECONDS
+        value: "10"
+      - key: REGISTRY_MAX_RETRIES
+        value: "2"
+      - key: REGISTRY_MIN_RELEVANCE
+        value: "0.80"
+      - key: REGISTRY_MIN_COMPANION_STRENGTH
+        value: "0.60"
+      - key: REGISTRY_MAX_DEPENDENCY_DEPTH
+        value: "2"
+      - key: REGISTRY_MAX_SOURCES
+        value: "12"
+      - key: REGISTRY_INCLUDE_PENDING
+        value: "false"
+    disk:
+      name: forecast-studio-data
+      mountPath: /var/data
+      sizeGB: 1
