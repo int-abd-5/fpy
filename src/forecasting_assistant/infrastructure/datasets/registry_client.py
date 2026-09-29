@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import ipaddress
 import json
-import socket
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -42,13 +40,7 @@ class RegistryTransport(Protocol):
 def _is_local_host(hostname: str | None) -> bool:
     if not hostname:
         return False
-    lowered = hostname.casefold()
-    if lowered in {"localhost", "127.0.0.1", "::1"}:
-        return True
-    try:
-        return not ipaddress.ip_address(lowered).is_global
-    except ValueError:
-        return False
+    return hostname.casefold() in {"localhost", "127.0.0.1", "::1"}
 
 
 def _normalize_base_url(base_url: str) -> str:
@@ -85,7 +77,7 @@ class _UrllibRegistryTransport:
                 return RegistryResponse(response.status, decoded)
         except HTTPError as error:
             return RegistryResponse(error.code, None)
-        except (OSError, URLError, socket.timeout, TimeoutError) as error:
+        except (OSError, URLError, TimeoutError) as error:
             raise RegistryUnavailableError("registry API could not be reached") from error
 
 
@@ -151,7 +143,7 @@ class RegistryClient:
                     headers=headers,
                     timeout_seconds=timeout,
                 )
-            except (RegistryUnavailableError, OSError, TimeoutError, socket.timeout) as error:
+            except (RegistryUnavailableError, OSError, TimeoutError) as error:
                 if attempt < self._max_retries:
                     self._sleeper(2.0**attempt)
                     continue

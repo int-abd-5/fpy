@@ -3,8 +3,6 @@ from __future__ import annotations
 import json
 from http import HTTPStatus
 
-import pytest
-
 from forecasting_assistant.config import Settings
 from forecasting_assistant.infrastructure.datasets.adapters import LocalUploadAdapter
 from forecasting_assistant.infrastructure.datasets.registry_client import RegistryUnavailableError

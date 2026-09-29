@@ -151,3 +151,8 @@ def test_registry_api_key_is_sent_as_bearer_without_being_exposed_in_errors() ->
 
     assert transport.calls[0]["headers"]["Authorization"] == f"Bearer {secret}"
     assert secret not in str(error.value)
+
+
+def test_non_local_http_registry_url_is_rejected() -> None:
+    with pytest.raises(ValueError, match="must use HTTPS"):
+        RegistryClient("http://10.0.0.5")

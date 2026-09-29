@@ -106,7 +106,8 @@ class RegistryDatasetAdapter:
         if not isinstance(endpoint_url, str) or urlsplit(endpoint_url).scheme not in {"http", "https"}:
             return None
 
-        provider = source.get("provider") if isinstance(source.get("provider"), dict) else {}
+        raw_provider = source.get("provider")
+        provider: dict[str, Any] = raw_provider if isinstance(raw_provider, dict) else {}
         provider_name = str(provider.get("name") or provider.get("code") or "Registry provider")
         provider_license = provider.get("license") or provider.get("license_name")
         tags = [
@@ -215,7 +216,7 @@ def _parse_date(value: Any) -> date | None:
     if not text:
         return None
     try:
-        return datetime.fromisoformat(text.replace("Z", "+00:00")).date()
+        return datetime.fromisoformat(text).date()
     except ValueError:
         try:
             return date.fromisoformat(text[:10])
