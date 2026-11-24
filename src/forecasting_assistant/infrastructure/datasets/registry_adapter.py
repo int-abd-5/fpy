@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from datetime import date, datetime
 from typing import Any
@@ -68,9 +69,9 @@ class RegistryDatasetAdapter:
         return result.model_copy(update={"metadata": metadata})
 
     def _resolve_payload(self, query: DatasetSearchQuery) -> dict[str, Any]:
-        target = query.target.strip()
+        target = _canonical_registry_target(query.target)
         payload: dict[str, Any] = {
-            "prompt": target,
+            "prompt": (query.prompt or query.target).strip(),
             "min_relevance": self._settings.registry_min_relevance,
             "min_companion_strength": self._settings.registry_min_companion_strength,
             "max_dependency_depth": self._settings.registry_max_dependency_depth,
@@ -79,12 +80,10 @@ class RegistryDatasetAdapter:
                 self._settings.registry_include_pending and not self._settings.registry_required
             ),
         }
-        if "." in target:
+        if target:
             payload["target"] = target
-        elif target:
-            payload["fields"] = [target]
         if query.geography:
-            payload["geo"] = ", ".join(query.geography)
+            payload["geo"] = _registry_geo(query.geography)
         if query.frequency:
             payload["frequency"] = query.frequency
         return payload
@@ -239,3 +238,38 @@ def _redact(value: Any) -> Any:
     if isinstance(value, list):
         return [_redact(item) for item in value]
     return value
+
+
+_CANONICAL_TARGETS = (
+    (re.compile(r"\b(inflation|consumer price)\b"), "macro.inflation"),
+    (re.compile(r"\b(life expectancy|healthy life expectancy)\b"), "health.life_expectancy"),
+    (re.compile(r"\b(gdp growth|gross domestic product growth)\b"), "macro.gdp_growth"),
+    (re.compile(r"\b(gross domestic product|gdp)\b"), "macro.gdp"),
+    (re.compile(r"\b(exchange rate)\b"), "macro.exchange_rate"),
+    (re.compile(r"\b(interest rate|policy rate)\b"), "macro.interest_rate"),
+    (re.compile(r"\b(bitcoin|btc)\b"), "finance.bitcoin"),
+    (re.compile(r"\b(population)\b"), "population"),
+    (re.compile(r"\b(poverty)\b"), "poverty"),
+)
+
+
+def _canonical_registry_target(value: str) -> str | None:
+    text = value.strip()
+    if not text:
+        return None
+    if re.fullmatch(r"[a-z0-9_]+(?:\.[a-z0-9_]+)+", text.casefold()):
+        return text
+    normalized = text.casefold()
+    for pattern, canonical in _CANONICAL_TARGETS:
+        if pattern.search(normalized):
+            return canonical
+    return None
+
+
+def _registry_geo(values: list[str]) -> str:
+    normalized = " ".join(values).casefold()
+    if any(value in normalized for value in ("global", "world", "worldwide")):
+        return "global"
+    if any(value in normalized for value in ("region", "regional", "middle east", "europe")):
+        return "region"
+    return "country"

@@ -15,7 +15,10 @@ from forecasting_assistant.infrastructure.datasets.adapters import (
 )
 from forecasting_assistant.infrastructure.datasets.protocol import DatasetSourceAdapter, HttpClient
 from forecasting_assistant.infrastructure.datasets.registry_adapter import RegistryDatasetAdapter
-from forecasting_assistant.infrastructure.datasets.registry_client import RegistryClient
+from forecasting_assistant.infrastructure.datasets.registry_client import (
+    RegistryClient,
+    RegistryTraceSink,
+)
 
 
 @dataclass(frozen=True)
@@ -70,6 +73,7 @@ def build_default_adapters(
     http: HttpClient,
     *,
     settings: Settings | None = None,
+    trace_sink: RegistryTraceSink | None = None,
 ) -> list[DatasetSourceAdapter]:
     configured = settings or get_settings()
     if configured.registry_api_url.strip():
@@ -78,6 +82,7 @@ def build_default_adapters(
             api_key=configured.registry_api_key,
             timeout_seconds=configured.registry_timeout_seconds,
             max_retries=configured.registry_max_retries,
+            trace_sink=trace_sink,
         )
         return [
             LocalUploadAdapter(),

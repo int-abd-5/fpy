@@ -398,7 +398,11 @@ class DashboardServer:
         http = SecureHttpClient()
         self.catalog_repository = catalog_repository
         self.dataset_service = DatasetDiscoveryService(
-            build_default_adapters(http, settings=self.settings),
+            build_default_adapters(
+                http,
+                settings=self.settings,
+                trace_sink=pipeline_sink,
+            ),
             catalog_repository,
             ContentAddressedObjectStore(self.settings.dataset_store_path),
         )

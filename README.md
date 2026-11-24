@@ -2,6 +2,13 @@
 
 This repository implements the first two milestones of an automated time-series forecasting pipeline: turning a free-text request into a validated, explicitly confirmed `ForecastingSpecification`, then discovering, ranking, explicitly selecting, and safely caching suitable datasets. It does not train forecasting models.
 
+## Architecture and decision documentation
+
+- [Decisions.md](Decisions.md) records why important AI, state-management, catalog, safety, and deployment choices were made.
+- [Flow.md](Flow.md) maps execution across interfaces, functions, persistence, provider calls, catalog discovery, and dataset fetching.
+
+Both files are maintained alongside implementation changes. Use the flow checkpoints and runtime event names there when debugging a new iteration.
+
 ## Research Basis
 
 The design combines two research directions:
@@ -100,6 +107,14 @@ forecast-elicitation persistent-interview
 This pilot creates one OpenAI Conversations API conversation for each dialogue and reuses it for the extraction, question, and user-follow-up chat calls. The conversation ID is saved with the local dialogue state, while SQLite remains authoritative for slot values, validation, readiness, and confirmation. The pilot uses provider-side storage, so use it only with data that is appropriate for that retention policy. The normal `interview` command remains stateless at the provider. Follow-up questions such as “What does this mean?” are answered in plain language and do not fill or change the pending requirement.
 
 Every interview also appends the same redacted pipeline events to `logs/elicitation_pipeline.jsonl` by default. Set `ELICITATION_LOG_PATH` in `.env` to change the location. The file records timestamps, API request features and inputs, structured responses, state recovery/reducer results, selected next slots, and the exact assistant message shown to the user. API keys and credential values are redacted, but user messages can still contain sensitive business data; treat this file as sensitive.
+
+To run the six sequential live workflow scenarios, using the configured OpenAI provider and registry, run:
+
+```bash
+./.venv/bin/python scripts/run_live_workflows.py
+```
+
+The sanitized scenario report is written to `evaluation/live_workflow_results.json`. The run uses a temporary state/store per scenario and a synthetic user scope for testing dataset selection and fetching.
 
 The normal `interview --trace` command additionally prints those events to the terminal. API keys and credential values are never printed. Persistent interview is always chat-only in the terminal, even if the compatibility flag `persistent-interview --trace` is supplied; its diagnostics remain in the JSONL log file.
 

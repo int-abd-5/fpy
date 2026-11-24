@@ -9,6 +9,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit, urlunsplit
 from urllib.request import Request, build_opener
 
+from forecasting_assistant.prompts.extractor import safe_provider_value
+
 
 class RegistryApiError(RuntimeError):
     """The registry returned an invalid or non-successful API response."""
@@ -16,6 +18,9 @@ class RegistryApiError(RuntimeError):
 
 class RegistryUnavailableError(RegistryApiError):
     """The registry could not be reached after bounded retries."""
+
+
+RegistryTraceSink = Callable[[str, dict[str, Any]], None]
 
 
 @dataclass(frozen=True)
@@ -91,6 +96,7 @@ class RegistryClient:
         max_retries: int = 2,
         transport: RegistryTransport | None = None,
         sleeper: Callable[[float], None] = time.sleep,
+        trace_sink: RegistryTraceSink | None = None,
     ) -> None:
         self._base_url = _normalize_base_url(base_url)
         self._api_key = api_key
@@ -98,6 +104,15 @@ class RegistryClient:
         self._max_retries = max_retries
         self._transport = transport or _UrllibRegistryTransport()
         self._sleeper = sleeper
+        self._trace_sink = trace_sink
+
+    def _trace(self, stage: str, payload: dict[str, Any]) -> None:
+        if self._trace_sink is None:
+            return
+        try:
+            self._trace_sink(stage, safe_provider_value(payload))
+        except Exception:  # noqa: BLE001 - diagnostics must never break registry calls
+            return
 
     def health(
         self,
@@ -147,6 +162,22 @@ class RegistryClient:
         timeout = timeout_seconds or self._timeout_seconds
         retries = self._max_retries if max_retries is None else max_retries
         for attempt in range(retries + 1):
+            operation = (
+                "resolve"
+                if path == "/resolve"
+                else "health"
+                if path == "/healthz"
+                else "request"
+            )
+            self._trace(
+                f"registry.{operation}.request",
+                {
+                    "attempt": attempt + 1,
+                    "method": method,
+                    "path": path,
+                    "payload": request_payload,
+                },
+            )
             try:
                 response = self._transport.request(
                     method,
@@ -156,10 +187,30 @@ class RegistryClient:
                     timeout_seconds=timeout,
                 )
             except (RegistryUnavailableError, OSError, TimeoutError) as error:
+                self._trace(
+                    f"registry.{operation}.error",
+                    {
+                        "attempt": attempt + 1,
+                        "method": method,
+                        "path": path,
+                        "error_type": type(error).__name__,
+                        "error": str(error),
+                    },
+                )
                 if attempt < retries:
                     self._sleeper(2.0**attempt)
                     continue
                 raise RegistryUnavailableError("registry API could not be reached") from error
+            self._trace(
+                f"registry.{operation}.response",
+                {
+                    "attempt": attempt + 1,
+                    "method": method,
+                    "path": path,
+                    "status_code": response.status_code,
+                    "payload": response.payload,
+                },
+            )
             if response.status_code >= 500:
                 if attempt < retries:
                     self._sleeper(2.0**attempt)

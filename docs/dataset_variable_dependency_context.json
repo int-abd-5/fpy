@@ -1,0 +1,267 @@
+{
+  "context_name": "Automated Tabular Time-Series Forecasting: Dataset, Variable, and Dependency Context",
+  "context_version": "1.0.0",
+  "purpose": "Provide an LLM with accurate context about the FYP data catalog, dataset variables, dependency thresholds, related sources, and current registry API behavior.",
+  "project": {
+    "name": "Automated Tabular Time Series Forecasting",
+    "goal": "Turn a novice user's forecasting request into a confirmed specification, find suitable catalog data, prepare a clean time-indexed table, and eventually train and package a forecasting model.",
+    "current_pipeline_boundary": "The current application confirms requirements and resolves catalog candidates through a separately hosted registry HTTP API. Actual data fetching is a later, separately validated step. Model training is outside the current implementation boundary.",
+    "registry_architecture": "The forecasting application must call the registry API. It must not connect directly to the registry database or invent dataset URLs and dependency relationships."
+  },
+  "terminology": {
+    "dataset_source": "A catalog record describing a data source, including its publisher, endpoint, status, frequency, geography, tags, fields, license, and update information.",
+    "target_variable": "The measure the user wants to forecast, such as macro.inflation or finance.bitcoin. It is not necessarily the dataset's file name.",
+    "target_source": "A verified catalog source that contains data relevant to the requested forecast target.",
+    "companion_source": "A separate source or variable suggested by the registry as related to the target. It may be considered later as an additional predictor after inspection, alignment, validation, and user approval.",
+    "field_or_variable": "A named column or measure in a dataset. Registry examples include name, dtype, and unit. The dataset may also contain a time column and grouping dimensions such as country, region, store, or product.",
+    "hierarchy": "A grouping structure in which lower-level series may roll up to higher-level series, such as product to store to region. Registry hierarchy_paths are metadata clues and must be validated against the fetched data before forecasting.",
+    "lineage": "Metadata describing source provenance or dependency paths. Preserve it for auditability; do not treat lineage as evidence of causation.",
+    "dependency_depth": "The number of relationship steps the registry may traverse from a requested target when searching for related sources. The registry service is authoritative about the exact traversal implementation.",
+    "variable_min_max": "Optional data-profile bounds for one variable. observed_min and observed_max describe values actually found in the data; valid_min and valid_max describe domain constraints. These are different from the registry's dependency and relevance thresholds."
+  },
+  "resolve_api": {
+    "method": "POST",
+    "path": "/resolve",
+    "purpose": "Resolve a confirmed forecasting request into target sources, companion sources, lineage, and warnings.",
+    "required_response_keys": [
+      "target_sources",
+      "companion_sources",
+      "lineage",
+      "warnings"
+    ],
+    "current_request_fields": {
+      "prompt": {
+        "type": "string",
+        "meaning": "Confirmed natural-language forecasting description. The adapter uses query.prompt or falls back to query.target."
+      },
+      "target": {
+        "type": "string",
+        "meaning": "Optional canonical target identifier. The current adapter recognizes a limited set of target names and omits this field when it cannot canonicalize the target."
+      },
+      "geo": {
+        "type": "string",
+        "meaning": "Current adapter sends a geography category: global, region, or country. For country-level requests, the named country remains available in the prompt; the current adapter does not send the country name as geo."
+      },
+      "frequency": {
+        "type": "string",
+        "meaning": "Optional observation frequency such as hourly, daily, weekly, monthly, quarterly, or annual."
+      },
+      "min_relevance": {
+        "type": "number",
+        "range": [
+          0,
+          1
+        ],
+        "default": 0.8,
+        "meaning": "Minimum registry relevance score requested for matching target sources. Higher values are stricter; lower values can return broader matches."
+      },
+      "min_companion_strength": {
+        "type": "number",
+        "range": [
+          0,
+          1
+        ],
+        "default": 0.6,
+        "meaning": "Minimum relationship-strength threshold requested for companion-source discovery. Higher values request fewer, stronger matches; lower values may return more weakly related candidates. The registry service defines the score calculation."
+      },
+      "max_dependency_depth": {
+        "type": "integer",
+        "range": [
+          1,
+          5
+        ],
+        "default": 2,
+        "meaning": "Maximum relationship traversal depth requested from the registry. A depth of 1 generally means direct relationships; a depth of 2 permits one additional relationship step, subject to registry semantics."
+      },
+      "max_sources": {
+        "type": "integer",
+        "range": [
+          1,
+          100
+        ],
+        "default": 12,
+        "meaning": "Requested upper cap on source results. The registry service defines whether its cap counts target and companion sources together or separately."
+      },
+      "include_pending": {
+        "type": "boolean",
+        "default": false,
+        "meaning": "Whether pending registry entries may be included. Production/required-registry mode forces this to false."
+      }
+    },
+    "optional_fields_omitted_when_unknown": [
+      "target",
+      "geo",
+      "frequency"
+    ],
+    "fields_and_domains_status": "A design note mentions fields and domains, but the current RegistryDatasetAdapter does not include them in its /resolve request. Do not claim that they are sent until implementation changes.",
+    "internal_query_fields_not_currently_sent_to_resolve": [
+      "history_start",
+      "history_end",
+      "minimum_training_points",
+      "maximum_staleness_days",
+      "purpose",
+      "source_mode",
+      "source_reference",
+      "license_hint",
+      "contains_sensitive_data",
+      "user_id",
+      "latitude",
+      "longitude"
+    ],
+    "environment_settings": {
+      "REGISTRY_MIN_RELEVANCE": 0.8,
+      "REGISTRY_MIN_COMPANION_STRENGTH": 0.6,
+      "REGISTRY_MAX_DEPENDENCY_DEPTH": 2,
+      "REGISTRY_MAX_SOURCES": 12,
+      "REGISTRY_INCLUDE_PENDING": false,
+      "REGISTRY_REQUIRED": false
+    }
+  },
+  "canonical_targets_currently_recognized": {
+    "inflation or consumer price": "macro.inflation",
+    "life expectancy": "health.life_expectancy",
+    "GDP growth": "macro.gdp_growth",
+    "GDP": "macro.gdp",
+    "exchange rate": "macro.exchange_rate",
+    "interest rate or policy rate": "macro.interest_rate",
+    "Bitcoin or BTC": "finance.bitcoin",
+    "population": "population",
+    "poverty": "poverty"
+  },
+  "dataset_source_metadata": {
+    "registry_fields_to_preserve": [
+      "slug",
+      "name",
+      "description",
+      "provider",
+      "endpoint_url",
+      "endpoint_type",
+      "status",
+      "health",
+      "frequency",
+      "temporal_start",
+      "temporal_end",
+      "updated_at",
+      "remote_last_updated",
+      "tags",
+      "matched_tags",
+      "hierarchy_paths",
+      "fields",
+      "geography",
+      "geo",
+      "license",
+      "relevance_score",
+      "score",
+      "fetch_hint"
+    ],
+    "field_metadata_example": {
+      "name": "close",
+      "dtype": "number",
+      "unit": "USD"
+    },
+    "adapter_behavior": "The current adapter accepts target sources only when status is verified, health is ok or unknown, and an HTTP(S) endpoint URL is present. It maps field names and tags into its candidate model and preserves the original non-secret registry source object as metadata. A source with unknown health carries a warning and must still pass fetch-time validation."
+  },
+  "variable_ranges_and_data_quality": {
+    "distinguish_these_concepts": [
+      {
+        "name": "observed_min / observed_max",
+        "meaning": "Smallest and largest non-missing values measured in the fetched dataset during profiling.",
+        "when_known": "After fetching and profiling the actual data, unless the registry explicitly provides validated statistics.",
+        "llm_rule": "Do not invent these values from a variable name or dataset description."
+      },
+      {
+        "name": "valid_min / valid_max",
+        "meaning": "Optional domain-valid bounds for a variable, such as a percentage constrained to a known range.",
+        "when_known": "Only when provided by reliable metadata, a schema, or a documented domain rule.",
+        "llm_rule": "Do not assume observed bounds are valid bounds; a sample may not contain the full valid range."
+      },
+      {
+        "name": "min_relevance / min_companion_strength",
+        "meaning": "Registry search thresholds, not minimum values of a dataset variable."
+      },
+      {
+        "name": "max_dependency_depth / max_sources",
+        "meaning": "Registry graph-search limits, not maximum values or ranges of dataset variables."
+      }
+    ],
+    "recommended_optional_profile_fields": [
+      "observed_min",
+      "observed_max",
+      "valid_min",
+      "valid_max",
+      "missing_ratio",
+      "training_points",
+      "timestamp_valid",
+      "schema_valid",
+      "integrity_valid"
+    ],
+    "current_support_note": "The FYP's typed candidate model includes quality fields such as missing_ratio, timestamp_valid, schema_valid, integrity_valid, training_points, and staleness_days. Per-variable observed_min/observed_max are not currently calculated by the resolve adapter; preserve them only if the registry returns them, or calculate them after fetching data."
+  },
+  "dependency_and_correlation_metadata": {
+    "companion_source_fields": [
+      "slug",
+      "field",
+      "relation_type",
+      "matched_via",
+      "dependency_score",
+      "prior_strength",
+      "evidence_type",
+      "depth",
+      "note"
+    ],
+    "relation_type_examples": [
+      "correlates_with",
+      "driver_of"
+    ],
+    "interpretation_rules": [
+      "A companion is a candidate related source or variable, not automatically the forecast target.",
+      "correlation, dependency_score, prior_strength, and driver_of labels do not prove causation.",
+      "Do not automatically merge companion sources into the target dataset. Check matching timestamps, geography, frequency, units, missingness, licensing, and user approval first.",
+      "Treat depth as registry relationship depth; preserve the returned value and do not silently recalculate it.",
+      "The registry is the source of truth for relationship scores and threshold behavior."
+    ],
+    "illustrative_companion_entry_not_a_live_result": {
+      "slug": "fed-funds",
+      "field": "macro.interest_rate",
+      "relation_type": "correlates_with",
+      "matched_via": "finance.bitcoin",
+      "dependency_score": 0.64,
+      "prior_strength": 0.4,
+      "evidence_type": "curated_prior",
+      "depth": 1,
+      "note": "Illustrative liquidity-context note from a test fixture; not a claim of causal effect or a verified live recommendation."
+    }
+  },
+  "resolve_response_contract": {
+    "target_sources": "Candidate data sources that match the requested target and pass the registry's selection criteria.",
+    "companion_sources": "Related sources or fields returned under the dependency search thresholds.",
+    "lineage": "Provenance or relationship-path metadata returned by the registry.",
+    "warnings": "Registry notes about incomplete metadata, dependency interpretation, source status, or limitations. Preserve and show relevant warnings."
+  },
+  "example_current_resolve_request": {
+    "prompt": "Predict Pakistan's inflation rate using the previous year's inflation value and year-over-year inflation change",
+    "target": "macro.inflation",
+    "geo": "country",
+    "frequency": "annual",
+    "min_relevance": 0.8,
+    "min_companion_strength": 0.6,
+    "max_dependency_depth": 2,
+    "max_sources": 12,
+    "include_pending": false
+  },
+  "pipeline_and_safety_rules": [
+    "Requirements must be confirmed before catalog resolution.",
+    "The registry resolves metadata; the separate fetch step downloads only a returned, validated endpoint URL.",
+    "Never fabricate datasets, source URLs, field ranges, companion links, dependency scores, or lineage.",
+    "Keep dataset discovery, selection, fetch, schema inspection, cleaning, and model training as distinct stages.",
+    "A catalog relationship is a discovery hint. It does not establish that the variable improves forecast accuracy.",
+    "Use the dataset's actual time column, target field, and grouping fields after fetching; do not infer column names solely from the user's prompt."
+  ],
+  "repository_sources_of_truth": [
+    "src/forecasting_assistant/domain/datasets.py",
+    "src/forecasting_assistant/application/dataset_query.py",
+    "src/forecasting_assistant/infrastructure/datasets/registry_adapter.py",
+    "src/forecasting_assistant/config.py",
+    "docs/superpowers/specs/2026-09-29-registry-client-render-readiness.md"
+  ]
+}

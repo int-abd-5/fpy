@@ -687,18 +687,26 @@ class ElicitationEngine:
             self._sync_provider_context(state)
             self._trace("state.extraction_received", extraction.model_dump(mode="json"))
             recovered = self._recover_selected_slot_answer(state, turn_number, message)
-            extracted_slot_ids = {update.slot_id for update in extraction.updates}
-            recovery_is_for_pending_slot = (
-                recovered is not None and recovered[1] not in extracted_slot_ids
-            )
-            bad_intent_for_recovery = extraction.intent in {
-                Intent.NOT_FORECASTING,
-                Intent.UNSUPPORTED,
-            } | ({Intent.AMBIGUOUS} if recovered is not None and recovered[1] == "intent" else set())
-            if recovered is not None and (
-                recovery_is_for_pending_slot or bad_intent_for_recovery
-            ):
-                state, slot_id = recovered
+            if recovered is not None:
+                recovered_state, slot_id = recovered
+                try:
+                    updated = apply_extraction(
+                        state,
+                        extraction,
+                        self._schema,
+                        turn_number,
+                        message,
+                    )
+                except Exception:  # noqa: BLE001 - fall back to the validated user answer
+                    state = recovered_state
+                else:
+                    # The application chose this pending slot from its state;
+                    # the user's valid answer wins over a provider guess for it.
+                    updated.slots[slot_id] = recovered_state.slots[slot_id]
+                    if recovered_state.intent == Intent.CREATE_FORECAST:
+                        updated.intent = recovered_state.intent
+                        updated.slots["intent"] = recovered_state.slots["intent"]
+                    state = updated
                 self._trace(
                     "state.recovery_applied",
                     {"slot_id": slot_id, "state_after": self._trace_state(state)},

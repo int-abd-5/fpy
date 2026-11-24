@@ -51,7 +51,7 @@ def test_cli_dataset_service_passes_settings_to_adapter_factory(monkeypatch, tmp
 
     monkeypatch.setattr(cli, "get_settings", lambda: settings)
 
-    def fake_factory(http, *, settings):
+    def fake_factory(http, *, settings, trace_sink=None):
         captured["settings"] = settings
         return [LocalUploadAdapter()]
 
@@ -69,7 +69,7 @@ def test_web_dashboard_uses_registry_configured_adapters(monkeypatch, tmp_path) 
     monkeypatch.setattr(web, "get_settings", lambda: settings)
     monkeypatch.setattr(web, "RegistryClient", HealthyRegistryClient)
 
-    def fake_factory(http, *, settings):
+    def fake_factory(http, *, settings, trace_sink=None):
         captured["settings"] = settings
         return [LocalUploadAdapter()]
 
@@ -91,7 +91,11 @@ def test_healthz_reports_app_and_registry_status_without_secrets(monkeypatch, tm
     )
     monkeypatch.setattr(web, "get_settings", lambda: settings)
     monkeypatch.setattr(web, "RegistryClient", HealthyRegistryClient)
-    monkeypatch.setattr(web, "build_default_adapters", lambda http, *, settings: [LocalUploadAdapter()])
+    monkeypatch.setattr(
+        web,
+        "build_default_adapters",
+        lambda http, *, settings, trace_sink=None: [LocalUploadAdapter()],
+    )
 
     server = web.DashboardServer("127.0.0.1", 0)
     try:
@@ -118,7 +122,11 @@ def test_required_registry_failure_returns_service_unavailable(monkeypatch, tmp_
     )
     monkeypatch.setattr(web, "get_settings", lambda: settings)
     monkeypatch.setattr(web, "RegistryClient", UnavailableRegistryClient)
-    monkeypatch.setattr(web, "build_default_adapters", lambda http, *, settings: [LocalUploadAdapter()])
+    monkeypatch.setattr(
+        web,
+        "build_default_adapters",
+        lambda http, *, settings, trace_sink=None: [LocalUploadAdapter()],
+    )
 
     server = web.DashboardServer("127.0.0.1", 0)
     try:

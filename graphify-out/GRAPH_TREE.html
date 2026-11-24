@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>/ — graphify tree viewer</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f9f9f9;
+      color: #333;
+    }
+    h1 {
+      margin: 20px 0 0 24px;
+      font-size: 2.2rem;
+      font-weight: bold;
+      color: #1e3a56;
+    }
+    .controls {
+      margin: 20px 0 15px 24px;
+    }
+    button {
+      margin-right: 10px;
+      padding: 8px 18px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s ease-in-out;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button:active {
+      background: #004085;
+    }
+    #tree-container {
+      width: calc(100vw - 48px); /* Adjust for body margin/padding */
+      height: 85vh;
+      overflow: auto;
+      border-radius: 8px;
+      background: #fff;
+      margin-left: 24px;
+      margin-right: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      border: 1px solid #ddd;
+    }
+    svg {
+      background: #fff;
+      border-radius: 8px;
+      display: block; /* Important for D3 */
+    }
+    .node circle {
+      stroke-width: 2.5px;
+    }
+    .node text { /* Base style for the <text> container */
+      font: 13px 'Segoe UI', sans-serif;
+      paint-order: stroke fill; /* Ensures text is readable over lines */
+      stroke: #fff; /* White halo */
+      stroke-width: 3px; /* Halo thickness */
+      stroke-linejoin: round;
+      stroke-opacity: 0.85; /* Halo opacity */
+    }
+    .link {
+      fill: none;
+      stroke-opacity: 0.7;
+      stroke-width: 2px;
+    }
+  </style>
+</head>
+<body>
+  <h1>/ — Knowledge Graph</h1>
+  <div class="controls">
+    <button onclick="expandAll()">Expand All</button>
+    <button onclick="collapseAll()">Collapse All</button>
+    <button onclick="resetView()">Reset View</button>
+  </div>
+  <div id="tree-container">
+    <svg id="tree-svg" width="6000" height="8000"></svg>
+  </div>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    const initialJsonData = {"name":"/","total_count":586,"children":[{"name":".venv-py39-backup","total_count":6,"children":[{"name":"bin","total_count":6,"children":[{"name":"Activate.ps1","total_count":4,"children":[{"name":"Get-PyVenvConfig()","total_count":1,"children":[]},{"name":"global:_OLD_VIRTUAL_PROMPT()","total_count":1,"children":[]},{"name":"global:deactivate()","total_count":1,"children":[]},{"name":"global:prompt()","total_count":1,"children":[]}]},{"name":"pip","total_count":1,"children":[]},{"name":"pip3","total_count":1,"children":[]}]}]},{"name":"evaluation","total_count":5,"children":[{"name":"__init__.py","total_count":1,"children":[{"name":"Deterministic FYP evaluation assets.","total_count":1,"children":[]}]},{"name":"build_scenarios.py","total_count":4,"children":[{"name":"_case()","total_count":1,"children":[]},{"name":"build_scenarios()","total_count":1,"children":[]},{"name":"main()","total_count":1,"children":[]},{"name":"validate_scenarios()","total_count":1,"children":[]}]}]},{"name":"pyproject.toml","total_count":1,"children":[{"name":"forecasting-requirement-elicitation","total_count":1,"children":[]}]},{"name":"scripts","total_count":6,"children":[{"name":"__init__.py","total_count":1,"children":[{"name":"Executable project scripts.","total_count":1,"children":[]}]},{"name":"evaluate_elicitation.py","total_count":5,"children":[{"name":"_divide()","total_count":1,"children":[]},{"name":"_fake_record()","total_count":1,"children":[]},{"name":"compute_metrics()","total_count":1,"children":[]},{"name":"evaluate()","total_count":1,"children":[]},{"name":"main()","total_count":1,"children":[]}]}]},{"name":"src","total_count":324,"children":[{"name":"forecasting_assistant","total_count":324,"children":[{"name":"application","total_count":101,"children":[{"name":"clarification.py","total_count":12,"children":[{"name":"_candidate_status()","total_count":1,"children":[]},{"name":"_intermediate_unresolved_slots()","total_count":1,"children":[]},{"name":"_is_required()","total_count":1,"children":[]},{"name":"_is_unresolved()","total_count":1,"children":[]},{"name":"_reason()","total_count":1,"children":[]},{"name":"ClarificationCandidate","total_count":1,"children":[]},{"name":"evaluate_readiness()","total_count":1,"children":[]},{"name":"intermediate_core_slot_ids()","total_count":1,"children":[]},{"name":"Rank unresolved requirements supplied to the provider for intermediate mode.","total_count":1,"children":[]},{"name":"rank_priority_slots()","total_count":1,"children":[]},{"name":"Return the requirements needed for a useful intermediate forecast brief.","total_count":1,"children":[]},{"name":"select_next_slot()","total_count":1,"children":[]}]},{"name":"dataset_discovery.py","total_count":13,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":"._cache_is_fresh()","total_count":1,"children":[]},{"name":".confirm_dataset()","total_count":1,"children":[]},{"name":".discover()","total_count":1,"children":[]},{"name":".discover_for_specification()","total_count":1,"children":[]},{"name":".fetch_selection()","total_count":1,"children":[]},{"name":".store_derived_version()","total_count":1,"children":[]},{"name":"_validate_fetched_content()","total_count":1,"children":[]},{"name":"DatasetCandidateNotSelectableError","total_count":1,"children":[]},{"name":"DatasetDiscoveryService","total_count":1,"children":[]},{"name":"DatasetPlanNotFoundError","total_count":1,"children":[]},{"name":"DatasetSelectionNotFoundError","total_count":1,"children":[]},{"name":"Store a normalized derivative without overwriting its immutable raw parent.","total_count":1,"children":[]}]},{"name":"dataset_query.py","total_count":4,"children":[{"name":"_date()","total_count":1,"children":[]},{"name":"_duration_text()","total_count":1,"children":[]},{"name":"_string_list()","total_count":1,"children":[]},{"name":"query_from_specification()","total_count":1,"children":[]}]},{"name":"dataset_ranking.py","total_count":15,"children":[{"name":"._access_score()","total_count":1,"children":[]},{"name":"._authority_score()","total_count":1,"children":[]},{"name":"._eligibility_reasons()","total_count":1,"children":[]},{"name":"._freshness_score()","total_count":1,"children":[]},{"name":"._license_score()","total_count":1,"children":[]},{"name":"._quality_score()","total_count":1,"children":[]},{"name":"._semantic_score()","total_count":1,"children":[]},{"name":"._temporal_score()","total_count":1,"children":[]},{"name":".rank()","total_count":1,"children":[]},{"name":"_frequency_unit()","total_count":1,"children":[]},{"name":"_geography_matches()","total_count":1,"children":[]},{"name":"_tokens()","total_count":1,"children":[]},{"name":"DatasetRanker","total_count":1,"children":[]},{"name":"Fail-closed eligibility and deterministic source ranking.","total_count":1,"children":[]},{"name":"ranking_sort_key()","total_count":1,"children":[]}]},{"name":"dataset_validation.py","total_count":3,"children":[{"name":"_json_point_count()","total_count":1,"children":[]},{"name":"DatasetPayloadValidationError","total_count":1,"children":[]},{"name":"validate_dataset_payload()","total_count":1,"children":[]}]},{"name":"interview_ontology.py","total_count":6,"children":[{"name":"Apply a small local ScoreOnto/ReRankOnto-style relevance bonus.","total_count":1,"children":[]},{"name":"gate_pruned_slots()","total_count":1,"children":[]},{"name":"ontology_path()","total_count":1,"children":[]},{"name":"OntologyPath","total_count":1,"children":[]},{"name":"relevance_bonus()","total_count":1,"children":[]},{"name":"Return slots that the current interview state has closed or deactivated.","total_count":1,"children":[]}]},{"name":"normalization.py","total_count":6,"children":[{"name":"_duration_from_text()","total_count":1,"children":[]},{"name":"_enum_key()","total_count":1,"children":[]},{"name":"_items()","total_count":1,"children":[]},{"name":"_normalize_enum_value()","total_count":1,"children":[]},{"name":"is_iana_timezone()","total_count":1,"children":[]},{"name":"normalize_value()","total_count":1,"children":[]}]},{"name":"orchestrator.py","total_count":23,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":"._ask()","total_count":1,"children":[]},{"name":"._confirmed_context()","total_count":1,"children":[]},{"name":"._finish_turn()","total_count":1,"children":[]},{"name":"._is_affirmative_answer()","total_count":1,"children":[]},{"name":"._is_catalog_confirmation()","total_count":1,"children":[]},{"name":"._is_confirmation_prompt()","total_count":1,"children":[]},{"name":"._known_context()","total_count":1,"children":[]},{"name":"._load()","total_count":1,"children":[]},{"name":"._pending_answer_feedback()","total_count":1,"children":[]},{"name":"._previous_assistant_message()","total_count":1,"children":[]},{"name":"._question_request()","total_count":1,"children":[]},{"name":"._recover_selected_slot_answer()","total_count":1,"children":[]},{"name":"._render_confirmation()","total_count":1,"children":[]},{"name":"._trace()","total_count":1,"children":[]},{"name":"._trace_state()","total_count":1,"children":[]},{"name":".confirm_specification()","total_count":1,"children":[]},{"name":".get_state()","total_count":1,"children":[]},{"name":".handle_user_message()","total_count":1,"children":[]},{"name":".set_dataset_columns()","total_count":1,"children":[]},{"name":".start_dialogue()","total_count":1,"children":[]},{"name":"DialogueNotFoundError","total_count":1,"children":[]},{"name":"ElicitationEngine","total_count":1,"children":[]}]},{"name":"state_reducer.py","total_count":9,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":"_apply_update()","total_count":1,"children":[]},{"name":"_canonical_evidence()","total_count":1,"children":[]},{"name":"_check_contract()","total_count":1,"children":[]},{"name":"_resolved_intent()","total_count":1,"children":[]},{"name":"apply_extraction()","total_count":1,"children":[]},{"name":"UnknownSlotError","total_count":1,"children":[]},{"name":"UnsupportedEvidenceError","total_count":1,"children":[]}]},{"name":"validation.py","total_count":10,"children":[{"name":"_column_values()","total_count":1,"children":[]},{"name":"_datetime()","total_count":1,"children":[]},{"name":"_datetime_order_issue()","total_count":1,"children":[]},{"name":"_issue()","total_count":1,"children":[]},{"name":"_number()","total_count":1,"children":[]},{"name":"_outside_range()","total_count":1,"children":[]},{"name":"_slot_value()","total_count":1,"children":[]},{"name":"is_unusable_reference()","total_count":1,"children":[]},{"name":"validate_dialogue()","total_count":1,"children":[]},{"name":"validate_slot()","total_count":1,"children":[]}]}]},{"name":"config.py","total_count":2,"children":[{"name":"get_settings()","total_count":1,"children":[]},{"name":"Settings","total_count":1,"children":[]}]},{"name":"domain","total_count":53,"children":[{"name":"conditions.py","total_count":10,"children":[{"name":"_duration_semantics()","total_count":1,"children":[]},{"name":"_duration_unit()","total_count":1,"children":[]},{"name":"_mentioned()","total_count":1,"children":[]},{"name":"_multi_geography()","total_count":1,"children":[]},{"name":"_same_granularity()","total_count":1,"children":[]},{"name":"_selected_covariates()","total_count":1,"children":[]},{"name":"_source_reference()","total_count":1,"children":[]},{"name":"_target_requires_sign_rule()","total_count":1,"children":[]},{"name":"_value()","total_count":1,"children":[]},{"name":"is_slot_active()","total_count":1,"children":[]}]},{"name":"datasets.py","total_count":20,"children":[{"name":".cache_identity()","total_count":1,"children":[]},{"name":".calculate_total()","total_count":1,"children":[]},{"name":".is_pakistan()","total_count":1,"children":[]},{"name":".production_compatible()","total_count":1,"children":[]},{"name":".stable_id()","total_count":1,"children":[]},{"name":".validate_identity()","total_count":1,"children":[]},{"name":"AcquisitionMode","total_count":1,"children":[]},{"name":"CatalogClass","total_count":1,"children":[]},{"name":"DatasetCandidate","total_count":1,"children":[]},{"name":"DatasetSearchQuery","total_count":1,"children":[]},{"name":"DatasetSelection","total_count":1,"children":[]},{"name":"DatasetVersion","total_count":1,"children":[]},{"name":"FetchResult","total_count":1,"children":[]},{"name":"LicenseAssessment","total_count":1,"children":[]},{"name":"QualityReport","total_count":1,"children":[]},{"name":"RankedDatasetCandidate","total_count":1,"children":[]},{"name":"RankingBreakdown","total_count":1,"children":[]},{"name":"SelectionStatus","total_count":1,"children":[]},{"name":"SourcePlan","total_count":1,"children":[]},{"name":"SourceRole","total_count":1,"children":[]}]},{"name":"models.py","total_count":16,"children":[{"name":".require_evidence_for_user_values()","total_count":1,"children":[]},{"name":"_decode_candidate_value()","total_count":1,"children":[]},{"name":"DialogueState","total_count":1,"children":[]},{"name":"DialogueTurn","total_count":1,"children":[]},{"name":"ExtractorResult","total_count":1,"children":[]},{"name":"ForecastingSpecification","total_count":1,"children":[]},{"name":"Intent","total_count":1,"children":[]},{"name":"QuestionOutput","total_count":1,"children":[]},{"name":"QuestionRequest","total_count":1,"children":[]},{"name":"ReadinessReport","total_count":1,"children":[]},{"name":"Requiredness","total_count":1,"children":[]},{"name":"SlotState","total_count":1,"children":[]},{"name":"SlotStatus","total_count":1,"children":[]},{"name":"SlotUpdate","total_count":1,"children":[]},{"name":"TurnResult","total_count":1,"children":[]},{"name":"ValidationIssue","total_count":1,"children":[]}]},{"name":"schema.py","total_count":7,"children":[{"name":".get()","total_count":1,"children":[]},{"name":"_build_slots()","total_count":1,"children":[]},{"name":"_slot()","total_count":1,"children":[]},{"name":"create_initial_state()","total_count":1,"children":[]},{"name":"ForecastingSchema","total_count":1,"children":[]},{"name":"load_schema()","total_count":1,"children":[]},{"name":"SlotDefinition","total_count":1,"children":[]}]}]},{"name":"infrastructure","total_count":118,"children":[{"name":"datasets","total_count":86,"children":[{"name":"__init__.py","total_count":1,"children":[{"name":"Dataset source, persistence, and object-storage infrastructure.","total_count":1,"children":[]}]},{"name":"adapters.py","total_count":36,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".describe()","total_count":1,"children":[]},{"name":".describe()","total_count":1,"children":[]},{"name":".describe()","total_count":1,"children":[]},{"name":".describe()","total_count":1,"children":[]},{"name":".describe()","total_count":1,"children":[]},{"name":".describe()","total_count":1,"children":[]},{"name":".fetch()","total_count":1,"children":[]},{"name":".fetch()","total_count":1,"children":[]},{"name":".fetch()","total_count":1,"children":[]},{"name":".fetch()","total_count":1,"children":[]},{"name":".fetch()","total_count":1,"children":[]},{"name":".fetch()","total_count":1,"children":[]},{"name":".search()","total_count":1,"children":[]},{"name":".search()","total_count":1,"children":[]},{"name":".search()","total_count":1,"children":[]},{"name":".search()","total_count":1,"children":[]},{"name":".search()","total_count":1,"children":[]},{"name":".search()","total_count":1,"children":[]},{"name":"_candidate()","total_count":1,"children":[]},{"name":"_matches()","total_count":1,"children":[]},{"name":"_words()","total_count":1,"children":[]},{"name":"international_catalog_adapters()","total_count":1,"children":[]},{"name":"LocalUploadAdapter","total_count":1,"children":[]},{"name":"NASAPowerAdapter","total_count":1,"children":[]},{"name":"pakistan_catalog_adapters()","total_count":1,"children":[]},{"name":"PMDWIS2Adapter","total_count":1,"children":[]},{"name":"research_catalog_adapter()","total_count":1,"children":[]},{"name":"StaticCatalogAdapter","total_count":1,"children":[]},{"name":"WHOGHOAdapter","total_count":1,"children":[]},{"name":"WorldBankAdapter","total_count":1,"children":[]}]},{"name":"http.py","total_count":12,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":"._validate()","total_count":1,"children":[]},{"name":".get_bytes()","total_count":1,"children":[]},{"name":".get_json()","total_count":1,"children":[]},{"name":".redirect_request()","total_count":1,"children":[]},{"name":"_default_resolver()","total_count":1,"children":[]},{"name":"_ValidatedRedirectHandler","total_count":1,"children":[]},{"name":"DatasetDownloadError","total_count":1,"children":[]},{"name":"SecureHttpClient","total_count":1,"children":[]},{"name":"UnsafeDatasetUrlError","total_count":1,"children":[]},{"name":"validate_public_https_url()","total_count":1,"children":[]}]},{"name":"object_store.py","total_count":4,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":".put()","total_count":1,"children":[]},{"name":".root()","total_count":1,"children":[]},{"name":"ContentAddressedObjectStore","total_count":1,"children":[]}]},{"name":"protocol.py","total_count":18,"children":[{"name":".describe()","total_count":1,"children":[]},{"name":".fetch()","total_count":1,"children":[]},{"name":".find_cached_version()","total_count":1,"children":[]},{"name":".get_bytes()","total_count":1,"children":[]},{"name":".get_json()","total_count":1,"children":[]},{"name":".initialize()","total_count":1,"children":[]},{"name":".load_candidate()","total_count":1,"children":[]},{"name":".load_plan()","total_count":1,"children":[]},{"name":".load_selection()","total_count":1,"children":[]},{"name":".load_version()","total_count":1,"children":[]},{"name":".save_candidate()","total_count":1,"children":[]},{"name":".save_plan()","total_count":1,"children":[]},{"name":".save_selection()","total_count":1,"children":[]},{"name":".save_version()","total_count":1,"children":[]},{"name":".search()","total_count":1,"children":[]},{"name":"DatasetCatalogRepository","total_count":1,"children":[]},{"name":"DatasetSourceAdapter","total_count":1,"children":[]},{"name":"HttpClient","total_count":1,"children":[]}]},{"name":"registry.py","total_count":2,"children":[{"name":"ApprovedFutureSource","total_count":1,"children":[]},{"name":"build_default_adapters()","total_count":1,"children":[]}]},{"name":"sqlite_repository.py","total_count":13,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":"._connect()","total_count":1,"children":[]},{"name":".find_cached_version()","total_count":1,"children":[]},{"name":".initialize()","total_count":1,"children":[]},{"name":".load_candidate()","total_count":1,"children":[]},{"name":".load_plan()","total_count":1,"children":[]},{"name":".load_selection()","total_count":1,"children":[]},{"name":".load_version()","total_count":1,"children":[]},{"name":".save_candidate()","total_count":1,"children":[]},{"name":".save_plan()","total_count":1,"children":[]},{"name":".save_selection()","total_count":1,"children":[]},{"name":".save_version()","total_count":1,"children":[]},{"name":"SQLiteDatasetCatalogRepository","total_count":1,"children":[]}]}]},{"name":"llm","total_count":11,"children":[{"name":"openai_responses.py","total_count":8,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":"._error_payload()","total_count":1,"children":[]},{"name":"._latency_options()","total_count":1,"children":[]},{"name":"._trace()","total_count":1,"children":[]},{"name":".ask()","total_count":1,"children":[]},{"name":".extract()","total_count":1,"children":[]},{"name":"LLMContractError","total_count":1,"children":[]},{"name":"OpenAIResponsesClient","total_count":1,"children":[]}]},{"name":"protocol.py","total_count":3,"children":[{"name":".ask()","total_count":1,"children":[]},{"name":".extract()","total_count":1,"children":[]},{"name":"StructuredLLMClient","total_count":1,"children":[]}]}]},{"name":"observability","total_count":5,"children":[{"name":"__init__.py","total_count":1,"children":[{"name":"Durable, redacted observability helpers for the elicitation pipeline.","total_count":1,"children":[]}]},{"name":"pipeline_logger.py","total_count":4,"children":[{"name":".__call__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":"Append one redacted, machine-readable record for every pipeline trace event.","total_count":1,"children":[]},{"name":"JsonlPipelineLogger","total_count":1,"children":[]}]}]},{"name":"persistence","total_count":16,"children":[{"name":"protocol.py","total_count":5,"children":[{"name":".append_event()","total_count":1,"children":[]},{"name":".load_state()","total_count":1,"children":[]},{"name":".save_specification()","total_count":1,"children":[]},{"name":".save_state()","total_count":1,"children":[]},{"name":"DialogueRepository","total_count":1,"children":[]}]},{"name":"sqlite_repository.py","total_count":11,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":"._connect()","total_count":1,"children":[]},{"name":"._dump()","total_count":1,"children":[]},{"name":".append_event()","total_count":1,"children":[]},{"name":".initialize()","total_count":1,"children":[]},{"name":".list_events()","total_count":1,"children":[]},{"name":".load_specification()","total_count":1,"children":[]},{"name":".load_state()","total_count":1,"children":[]},{"name":".save_specification()","total_count":1,"children":[]},{"name":".save_state()","total_count":1,"children":[]},{"name":"SQLiteDialogueRepository","total_count":1,"children":[]}]}]}]},{"name":"interfaces","total_count":33,"children":[{"name":"__init__.py","total_count":1,"children":[{"name":"User-facing interfaces.","total_count":1,"children":[]}]},{"name":"cli.py","total_count":20,"children":[{"name":"_compose_trace_sinks()","total_count":1,"children":[]},{"name":"_emit_trace()","total_count":1,"children":[]},{"name":"_render_source_plan()","total_count":1,"children":[]},{"name":"_world_bank_demo_values()","total_count":1,"children":[]},{"name":"build_dataset_service()","total_count":1,"children":[]},{"name":"build_engine()","total_count":1,"children":[]},{"name":"confirm_dataset()","total_count":1,"children":[]},{"name":"Create a confirmed trusted-source demo specification for World Bank inflation\u2026","total_count":1,"children":[]},{"name":"discover_datasets()","total_count":1,"children":[]},{"name":"Explicitly confirm one of the plan's eligible recommendations.","total_count":1,"children":[]},{"name":"Fetch a confirmed dataset, reusing a permitted fresh cached version.","total_count":1,"children":[]},{"name":"fetch_dataset()","total_count":1,"children":[]},{"name":"interview()","total_count":1,"children":[]},{"name":"main()","total_count":1,"children":[]},{"name":"Rank up to three datasets for a confirmed forecasting specification.","total_count":1,"children":[]},{"name":"Run an interactive forecasting requirements interview.","total_count":1,"children":[]},{"name":"Run forecasting requirement elicitation commands.","total_count":1,"children":[]},{"name":"Run the local web demo interface.","total_count":1,"children":[]},{"name":"seed_world_bank_demo()","total_count":1,"children":[]},{"name":"web()","total_count":1,"children":[]}]},{"name":"web.py","total_count":12,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":"._handler_class()","total_count":1,"children":[]},{"name":".serve()","total_count":1,"children":[]},{"name":"_connect()","total_count":1,"children":[]},{"name":"_json_default()","total_count":1,"children":[]},{"name":"_list_table()","total_count":1,"children":[]},{"name":"_source_plan_payload()","total_count":1,"children":[]},{"name":"_state_payload()","total_count":1,"children":[]},{"name":"_turn_payload()","total_count":1,"children":[]},{"name":"dashboard_html()","total_count":1,"children":[]},{"name":"DashboardServer","total_count":1,"children":[]},{"name":"run_web_server()","total_count":1,"children":[]}]}]},{"name":"prompts","total_count":16,"children":[{"name":"extractor.py","total_count":7,"children":[{"name":"_context_slot()","total_count":1,"children":[]},{"name":"_is_secret_key()","total_count":1,"children":[]},{"name":"_redact_text()","total_count":1,"children":[]},{"name":"_stable_sort_key()","total_count":1,"children":[]},{"name":"build_extractor_input()","total_count":1,"children":[]},{"name":"build_extractor_instructions()","total_count":1,"children":[]},{"name":"safe_provider_value()","total_count":1,"children":[]}]},{"name":"llmrei_long.py","total_count":9,"children":[{"name":"_contains_phrase()","total_count":1,"children":[]},{"name":"_context_value()","total_count":1,"children":[]},{"name":"_contextual_example()","total_count":1,"children":[]},{"name":"_duration_unit()","total_count":1,"children":[]},{"name":"build_question_input()","total_count":1,"children":[]},{"name":"build_question_instructions()","total_count":1,"children":[]},{"name":"example_answer()","total_count":1,"children":[]},{"name":"static_fallback_question()","total_count":1,"children":[]},{"name":"validate_question()","total_count":1,"children":[]}]}]},{"name":"__init__.py","total_count":1,"children":[]}]}]},{"name":"tests","total_count":244,"children":[{"name":"fakes.py","total_count":10,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".append_event()","total_count":1,"children":[]},{"name":".ask()","total_count":1,"children":[]},{"name":".extract()","total_count":1,"children":[]},{"name":".load_state()","total_count":1,"children":[]},{"name":".save_specification()","total_count":1,"children":[]},{"name":".save_state()","total_count":1,"children":[]},{"name":"FakeLLMClient","total_count":1,"children":[]},{"name":"InMemoryDialogueRepository","total_count":1,"children":[]}]},{"name":"integration","total_count":40,"children":[{"name":"test_cli.py","total_count":11,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":".confirm_specification()","total_count":1,"children":[]},{"name":".get_state()","total_count":1,"children":[]},{"name":".handle_user_message()","total_count":1,"children":[]},{"name":".start_dialogue()","total_count":1,"children":[]},{"name":"FakeEngine","total_count":1,"children":[]},{"name":"test_build_engine_wires_the_persistent_pipeline_logger()","total_count":1,"children":[]},{"name":"test_dataset_service_does_not_require_openai_key()","total_count":1,"children":[]},{"name":"test_interview_prints_one_message_per_turn_and_final_json()","total_count":1,"children":[]},{"name":"test_seed_world_bank_demo_creates_confirmed_trusted_source_spec()","total_count":1,"children":[]},{"name":"test_show_and_quit_do_not_call_provider()","total_count":1,"children":[]}]},{"name":"test_elicitation_flow.py","total_count":29,"children":[{"name":"_complete_result()","total_count":1,"children":[]},{"name":"_start()","total_count":1,"children":[]},{"name":"_update()","total_count":1,"children":[]},{"name":"test_catalog_answer_does_not_reopen_intent_question()","total_count":1,"children":[]},{"name":"test_catalog_confirmation_is_accepted_as_source_mode()","total_count":1,"children":[]},{"name":"test_complete_prompt_returns_confirmation_summary()","total_count":1,"children":[]},{"name":"test_confirmation_requires_explicit_true()","total_count":1,"children":[]},{"name":"test_data_list_phrase_fills_catalog_source_mode_on_first_try()","total_count":1,"children":[]},{"name":"test_data_list_variants_fill_catalog_source_mode_on_first_try()","total_count":1,"children":[]},{"name":"test_engine_trace_shows_answer_extraction_and_next_slot()","total_count":1,"children":[]},{"name":"test_explicit_confirmation_builds_specification()","total_count":1,"children":[]},{"name":"test_explicit_correction_updates_summary()","total_count":1,"children":[]},{"name":"test_forecasting_language_promotes_ambiguous_initial_intent()","total_count":1,"children":[]},{"name":"test_intermediate_brief_confirms_without_asking_advanced_ml_details()","total_count":1,"children":[]},{"name":"test_invalid_generated_question_retries_once_then_uses_valid_output()","total_count":1,"children":[]},{"name":"test_invalid_source_mode_answer_asks_for_confirmation_instead_of_repeating_choices()","total_count":1,"children":[]},{"name":"test_missing_target_asks_exactly_one_target_question()","total_count":1,"children":[]},{"name":"test_pending_source_failure_preserves_first_turn_extraction()","total_count":1,"children":[]},{"name":"test_provider_failure_uses_static_question_without_slot_mutation()","total_count":1,"children":[]},{"name":"test_selected_boolean_answer_overrides_bad_not_forecasting_intent()","total_count":1,"children":[]},{"name":"test_selected_boolean_answer_recovers_when_extractor_fails()","total_count":1,"children":[]},{"name":"test_selected_enum_answer_recovers_when_extractor_fails()","total_count":1,"children":[]},{"name":"test_selected_intent_question_accepts_yes_confirmation()","total_count":1,"children":[]},{"name":"test_short_answer_is_applied_to_the_slot_asked_by_the_previous_question()","total_count":1,"children":[]},{"name":"test_short_duration_answer_is_applied_to_the_pending_horizon_slot()","total_count":1,"children":[]},{"name":"test_short_time_column_answer_follows_the_previous_question()","total_count":1,"children":[]},{"name":"test_target_answer_updates_state_and_reaches_summary()","total_count":1,"children":[]},{"name":"test_unsupported_intent_returns_terminal_scope_message()","total_count":1,"children":[]},{"name":"test_yes_confirms_intermediate_brief_and_returns_specification()","total_count":1,"children":[]}]}]},{"name":"unit","total_count":194,"children":[{"name":"test_clarification.py","total_count":13,"children":[{"name":"_resolved_state()","total_count":1,"children":[]},{"name":"test_active_conditional_precedes_high_impact_optional()","total_count":1,"children":[]},{"name":"test_catalog_mode_does_not_ask_novice_for_internal_source_identifier()","total_count":1,"children":[]},{"name":"test_data_source_is_asked_before_dataset_column_questions()","total_count":1,"children":[]},{"name":"test_forecast_intent_is_gate_pruned_from_priority_slots()","total_count":1,"children":[]},{"name":"test_high_impact_optional_can_block_and_be_selected()","total_count":1,"children":[]},{"name":"test_inactive_conditionals_and_optional_slots_do_not_block()","total_count":1,"children":[]},{"name":"test_inferred_required_value_blocks_until_user_confirmed()","total_count":1,"children":[]},{"name":"test_intermediate_readiness_stops_before_advanced_machine_learning_details()","total_count":1,"children":[]},{"name":"test_priority_slots_are_numbered_for_the_intermediate_interview()","total_count":1,"children":[]},{"name":"test_readiness_requires_active_required_and_conditional_slots()","total_count":1,"children":[]},{"name":"test_select_next_slot_uses_required_status_priority()","total_count":1,"children":[]},{"name":"test_source_reference_is_asked_before_target_column_after_source_mode()","total_count":1,"children":[]}]},{"name":"test_conditions.py","total_count":15,"children":[{"name":"_state()","total_count":1,"children":[]},{"name":"test_activation_normalizes_case_sensitive_enum_values()","total_count":1,"children":[]},{"name":"test_all_sub_daily_aliases_activate_timezone()","total_count":1,"children":[]},{"name":"test_boolean_like_values_activate_and_deactivate_dependents()","total_count":1,"children":[]},{"name":"test_calendar_duration_aliases_compare_by_period_and_canonical_unit()","total_count":1,"children":[]},{"name":"test_every_schema_activation_rule_has_expected_positive_case()","total_count":1,"children":[]},{"name":"test_fixed_duration_magnitude_equivalence_does_not_activate_aggregation()","total_count":1,"children":[]},{"name":"test_granularity_compares_periods_and_common_aliases()","total_count":1,"children":[]},{"name":"test_granularity_difference_activates_aggregation_level_without_aggregation_method()","total_count":1,"children":[]},{"name":"test_granularity_rules_deactivate_when_frequency_and_output_match()","total_count":1,"children":[]},{"name":"test_malformed_geography_does_not_activate_multi_timezone_rule()","total_count":1,"children":[]},{"name":"test_missing_condition_slots_are_inactive_instead_of_crashing()","total_count":1,"children":[]},{"name":"test_panel_dataset_activates_series_identifiers()","total_count":1,"children":[]},{"name":"test_probabilistic_output_activates_intervals()","total_count":1,"children":[]},{"name":"test_unknown_activation_rule_is_rejected()","total_count":1,"children":[]}]},{"name":"test_config.py","total_count":2,"children":[{"name":"test_settings_accept_an_explicit_model_name()","total_count":1,"children":[]},{"name":"test_settings_default_model_allows_dataset_only_commands()","total_count":1,"children":[]}]},{"name":"test_dataset_discovery.py","total_count":26,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".describe()","total_count":1,"children":[]},{"name":".fetch()","total_count":1,"children":[]},{"name":".find_cached_version()","total_count":1,"children":[]},{"name":".initialize()","total_count":1,"children":[]},{"name":".load_candidate()","total_count":1,"children":[]},{"name":".load_plan()","total_count":1,"children":[]},{"name":".load_selection()","total_count":1,"children":[]},{"name":".load_version()","total_count":1,"children":[]},{"name":".save_candidate()","total_count":1,"children":[]},{"name":".save_plan()","total_count":1,"children":[]},{"name":".save_selection()","total_count":1,"children":[]},{"name":".save_version()","total_count":1,"children":[]},{"name":".search()","total_count":1,"children":[]},{"name":"_candidate()","total_count":1,"children":[]},{"name":"_service()","total_count":1,"children":[]},{"name":"FakeAdapter","total_count":1,"children":[]},{"name":"MemoryCatalogRepository","total_count":1,"children":[]},{"name":"test_discovery_returns_only_top_three_and_isolates_adapter_failures()","total_count":1,"children":[]},{"name":"test_executable_payload_fails_before_object_storage()","total_count":1,"children":[]},{"name":"test_invalid_or_inadequate_dataset_payloads_fail_closed()","total_count":1,"children":[]},{"name":"test_nonredistributable_data_is_user_scoped_and_not_cross_tenant()","total_count":1,"children":[]},{"name":"test_normalized_derivative_preserves_raw_parent_lineage()","total_count":1,"children":[]},{"name":"test_selection_requires_explicit_confirmation_and_recommended_candidate()","total_count":1,"children":[]},{"name":"test_shared_cache_is_reused_after_confirmed_selection()","total_count":1,"children":[]}]},{"name":"test_dataset_ranking.py","total_count":5,"children":[{"name":"_candidate()","total_count":1,"children":[]},{"name":"test_frequency_mismatch_disqualifies_pmd_and_allows_global_fallback()","total_count":1,"children":[]},{"name":"test_matching_pmd_station_data_ranks_above_modeled_global_weather()","total_count":1,"children":[]},{"name":"test_research_and_request_required_sources_fail_production_gates()","total_count":1,"children":[]},{"name":"test_sbp_and_pbs_primary_sources_outrank_secondary_mirrors()","total_count":1,"children":[]}]},{"name":"test_dataset_sources.py","total_count":9,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":".get_bytes()","total_count":1,"children":[]},{"name":".get_json()","total_count":1,"children":[]},{"name":"FakeHttp","total_count":1,"children":[]},{"name":"test_ndma_mhvra_and_open_data_pakistan_are_not_automatic_sources()","total_count":1,"children":[]},{"name":"test_pmd_wis2_core_metadata_is_production_eligible_input()","total_count":1,"children":[]},{"name":"test_research_catalog_stays_separate()","total_count":1,"children":[]},{"name":"test_secure_url_validation_rejects_private_hosts_credentials_and_executables()","total_count":1,"children":[]},{"name":"test_who_adapter_returns_concrete_matching_indicator_endpoint()","total_count":1,"children":[]}]},{"name":"test_dataset_sqlite_repository.py","total_count":1,"children":[{"name":"test_dataset_catalog_round_trips_candidate_plan_selection_and_version()","total_count":1,"children":[]}]},{"name":"test_domain_models.py","total_count":3,"children":[{"name":"test_provided_slot_requires_evidence()","total_count":1,"children":[]},{"name":"test_update_decodes_json_encoded_candidate_value()","total_count":1,"children":[]},{"name":"test_update_rejects_unknown_confidence_range()","total_count":1,"children":[]}]},{"name":"test_evaluation_dataset.py","total_count":2,"children":[{"name":"test_committed_jsonl_is_stable_and_matches_builder()","total_count":1,"children":[]},{"name":"test_dataset_has_exact_counts_unique_ids_and_valid_slots()","total_count":1,"children":[]}]},{"name":"test_evaluation_metrics.py","total_count":2,"children":[{"name":"test_empty_denominators_are_safe()","total_count":1,"children":[]},{"name":"test_perfect_results_produce_expected_metrics()","total_count":1,"children":[]}]},{"name":"test_extractor_prompt.py","total_count":8,"children":[{"name":"test_input_contains_active_slot_definitions_and_safe_context_only()","total_count":1,"children":[]},{"name":"test_input_contains_numbered_intermediate_priority_slots()","total_count":1,"children":[]},{"name":"test_input_identifies_the_pending_slot_and_latest_question()","total_count":1,"children":[]},{"name":"test_input_includes_columns_discovered_from_the_dataset()","total_count":1,"children":[]},{"name":"test_instructions_enforce_current_message_boundaries()","total_count":1,"children":[]},{"name":"test_preserves_benign_filename_text()","total_count":1,"children":[]},{"name":"test_redacts_credential_forms_from_current_message()","total_count":1,"children":[]},{"name":"test_redacts_nested_state_values_and_serializes_json_safe_values()","total_count":1,"children":[]}]},{"name":"test_openai_adapter.py","total_count":26,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".parse()","total_count":1,"children":[]},{"name":".parse()","total_count":1,"children":[]},{"name":".parse()","total_count":1,"children":[]},{"name":"_question_request()","total_count":1,"children":[]},{"name":"_result()","total_count":1,"children":[]},{"name":"InjectedClient","total_count":1,"children":[]},{"name":"RaisingConnectionResponses","total_count":1,"children":[]},{"name":"RaisingResponses","total_count":1,"children":[]},{"name":"RecordingOpenAI","total_count":1,"children":[]},{"name":"RecordingResponses","total_count":1,"children":[]},{"name":"test_adapter_configures_low_latency_provider_defaults()","total_count":1,"children":[]},{"name":"test_adapter_does_not_send_gpt5_reasoning_options_to_other_models()","total_count":1,"children":[]},{"name":"test_adapter_emits_redacted_request_and_response_trace()","total_count":1,"children":[]},{"name":"test_adapter_rejects_missing_parsed_output()","total_count":1,"children":[]},{"name":"test_adapter_trace_includes_underlying_connection_cause()","total_count":1,"children":[]},{"name":"test_adapter_uses_configured_structured_request_without_network()","total_count":1,"children":[]},{"name":"test_adapter_uses_minimal_reasoning_for_gpt5_mini()","total_count":1,"children":[]},{"name":"test_adapter_wraps_provider_exception_with_chaining()","total_count":1,"children":[]},{"name":"test_extractor_candidate_value_has_a_typed_strict_schema()","total_count":1,"children":[]},{"name":"test_fake_client_queues_results_and_records_requests()","total_count":1,"children":[]},{"name":"test_question_adapter_rejects_missing_parsed_output()","total_count":1,"children":[]},{"name":"test_question_adapter_uses_structured_stateless_request()","total_count":1,"children":[]},{"name":"test_question_adapter_wraps_provider_exception()","total_count":1,"children":[]}]},{"name":"test_pipeline_logger.py","total_count":1,"children":[{"name":"test_pipeline_logger_writes_timestamped_redacted_jsonl()","total_count":1,"children":[]}]},{"name":"test_question_policy.py","total_count":12,"children":[{"name":"_request()","total_count":1,"children":[]},{"name":"test_accepts_valid_bounded_selected_slot_questions()","total_count":1,"children":[]},{"name":"test_allows_candidate_already_present_in_confirmed_context()","total_count":1,"children":[]},{"name":"test_question_input_contains_numbered_intermediate_priority_slots()","total_count":1,"children":[]},{"name":"test_question_input_contains_the_selected_slot_example()","total_count":1,"children":[]},{"name":"test_question_input_redacts_provider_bound_credentials()","total_count":1,"children":[]},{"name":"test_question_instructions_include_llmrei_long_behaviors()","total_count":1,"children":[]},{"name":"test_questions_require_an_illustrative_example_answer()","total_count":1,"children":[]},{"name":"test_rejects_different_active_slot()","total_count":1,"children":[]},{"name":"test_rejects_multiple_or_missing_question_marks()","total_count":1,"children":[]},{"name":"test_rejects_question_that_suggests_unconfirmed_value()","total_count":1,"children":[]},{"name":"test_static_fallback_uses_schema_wording()","total_count":1,"children":[]}]},{"name":"test_schema.py","total_count":4,"children":[{"name":"test_initial_state_contains_every_slot_as_unmentioned()","total_count":1,"children":[]},{"name":"test_schema_has_unique_ids_and_approved_version()","total_count":1,"children":[]},{"name":"test_schema_protects_representative_slot_metadata()","total_count":1,"children":[]},{"name":"test_schema_rejects_unsupported_version()","total_count":1,"children":[]}]},{"name":"test_sqlite_repository.py","total_count":7,"children":[{"name":"repository()","total_count":1,"children":[]},{"name":"test_does_not_preserve_secret_reference_with_embedded_query_credential()","total_count":1,"children":[]},{"name":"test_events_are_append_only_and_round_trip()","total_count":1,"children":[]},{"name":"test_preserves_external_secret_reference()","total_count":1,"children":[]},{"name":"test_redacts_secret_material_before_state_and_event_persistence()","total_count":1,"children":[]},{"name":"test_specification_round_trip()","total_count":1,"children":[]},{"name":"test_state_round_trip_preserves_schema_and_turns()","total_count":1,"children":[]}]},{"name":"test_state_reducer.py","total_count":24,"children":[{"name":"_result()","total_count":1,"children":[]},{"name":"_state_with_confirmed_frequency()","total_count":1,"children":[]},{"name":"test_assistant_suggestion_cannot_become_user_evidence()","total_count":1,"children":[]},{"name":"test_blank_or_absent_evidence_is_rejected()","total_count":1,"children":[]},{"name":"test_confirmed_value_is_not_overwritten_without_correction_intent()","total_count":1,"children":[]},{"name":"test_context_echo_is_not_accepted_as_user_evidence()","total_count":1,"children":[]},{"name":"test_evidence_matching_is_case_insensitive_and_records_provenance()","total_count":1,"children":[]},{"name":"test_evidence_must_be_from_current_message_only_and_failure_is_atomic()","total_count":1,"children":[]},{"name":"test_explicit_correction_replaces_value_and_clears_confirmation()","total_count":1,"children":[]},{"name":"test_extractor_confirmed_status_is_downgraded_without_user_confirmation()","total_count":1,"children":[]},{"name":"test_input_state_is_deeply_unchanged()","total_count":1,"children":[]},{"name":"test_invalid_value_is_recorded_without_becoming_confirmed()","total_count":1,"children":[]},{"name":"test_multiple_updates_are_applied_in_order()","total_count":1,"children":[]},{"name":"test_mutating_extractor_nested_candidate_does_not_mutate_returned_state()","total_count":1,"children":[]},{"name":"test_natural_language_duration_update_is_valid()","total_count":1,"children":[]},{"name":"test_repeated_unconfirmed_updates_replace_value()","total_count":1,"children":[]},{"name":"test_same_confirmed_value_preserves_confirmation_and_status()","total_count":1,"children":[]},{"name":"test_schema_slot_missing_from_state_is_rejected_as_unknown()","total_count":1,"children":[]},{"name":"test_state_slot_not_registered_in_schema_is_rejected_as_unknown()","total_count":1,"children":[]},{"name":"test_top_level_forecast_intent_populates_required_intent_slot()","total_count":1,"children":[]},{"name":"test_unknown_slot_update_is_rejected()","total_count":1,"children":[]},{"name":"test_unmentioned_pending_update_does_not_discard_other_valid_updates()","total_count":1,"children":[]},{"name":"test_valid_update_preserves_existing_validation_errors_only_when_conflicting()","total_count":1,"children":[]},{"name":"test_wrapped_extractor_evidence_is_canonicalized_to_user_text()","total_count":1,"children":[]}]},{"name":"test_validation.py","total_count":31,"children":[{"name":"_dialogue()","total_count":1,"children":[]},{"name":"_slot()","total_count":1,"children":[]},{"name":"test_authentication_reference_requires_secret_scheme()","total_count":1,"children":[]},{"name":"test_benign_secret_phrase_is_not_a_raw_credential()","total_count":1,"children":[]},{"name":"test_case_normalization_applies_to_cross_field_requirements()","total_count":1,"children":[]},{"name":"test_credential_assignments_and_authorization_forms_are_rejected()","total_count":1,"children":[]},{"name":"test_cross_field_forecast_start_cannot_precede_cutoff()","total_count":1,"children":[]},{"name":"test_cross_field_history_dates_must_be_ordered()","total_count":1,"children":[]},{"name":"test_duration_rejects_non_finite_periods()","total_count":1,"children":[]},{"name":"test_future_covariates_require_availability()","total_count":1,"children":[]},{"name":"test_hierarchical_requires_hierarchy_columns()","total_count":1,"children":[]},{"name":"test_horizon_requires_positive_periods()","total_count":1,"children":[]},{"name":"test_invalid_datetime_text_is_a_validation_issue()","total_count":1,"children":[]},{"name":"test_invalid_timezone_is_a_validation_issue_not_exception()","total_count":1,"children":[]},{"name":"test_known_dataset_columns_reject_unknown_column_references()","total_count":1,"children":[]},{"name":"test_malformed_geography_is_reported_as_a_slot_issue()","total_count":1,"children":[]},{"name":"test_missing_slot_entries_do_not_crash_dialogue_validation()","total_count":1,"children":[]},{"name":"test_mixed_naive_and_aware_forecast_dates_return_issue()","total_count":1,"children":[]},{"name":"test_mixed_naive_and_aware_history_dates_return_issue()","total_count":1,"children":[]},{"name":"test_normalization_converts_datetimes_and_iana_timezones()","total_count":1,"children":[]},{"name":"test_normalization_converts_natural_language_durations()","total_count":1,"children":[]},{"name":"test_normalization_handles_schema_value_types()","total_count":1,"children":[]},{"name":"test_panel_requires_series_identifiers()","total_count":1,"children":[]},{"name":"test_percentage_rejects_values_above_one_hundred()","total_count":1,"children":[]},{"name":"test_probabilistic_output_requires_intervals_or_quantiles()","total_count":1,"children":[]},{"name":"test_probability_values_must_be_between_zero_and_one()","total_count":1,"children":[]},{"name":"test_raw_credentials_are_rejected()","total_count":1,"children":[]},{"name":"test_rejects_non_answers_for_dataset_or_source_fields()","total_count":1,"children":[]},{"name":"test_secret_references_are_not_flagged_as_raw_credentials()","total_count":1,"children":[]},{"name":"test_signature_credentials_are_rejected()","total_count":1,"children":[]},{"name":"test_signature_filename_is_not_a_raw_credential()","total_count":1,"children":[]}]},{"name":"test_web_interface.py","total_count":3,"children":[{"name":"test_dashboard_html_exposes_demo_panels()","total_count":1,"children":[]},{"name":"test_source_plan_payload_is_json_ready()","total_count":1,"children":[]},{"name":"test_state_payload_lists_slots_for_viewer()","total_count":1,"children":[]}]}]}]}]};
+
+    function transformData(jsonData) {
+        // Helper function to recursively build the children structure
+        function processNode(node, parentL1StageName) {
+            let displayName = node.name;
+            // Append total_count if it exists and is not already in the name
+            if (node.total_count !== undefined) {
+                if (!/\(Total Count: \d+\)$/.test(displayName)) {
+                    displayName += ` (Total Count: ${node.total_count})`;
+                }
+            }
+
+            const newNode = { name: displayName };
+
+            if (parentL1StageName === "Root") {
+                 newNode.originalStageName = node.name;
+            } else {
+                newNode.originalStageName = parentL1StageName;
+            }
+
+            if (node.children && node.children.length > 0) {
+                const stageNameToPass = (parentL1StageName === "Root") ? node.name : parentL1StageName;
+                newNode.children = node.children.map(child => processNode(child, stageNameToPass));
+            }
+
+            return newNode;
+        }
+
+        let rootDisplayName = jsonData.name;
+        if (jsonData.total_count !== undefined && !/\(Total Count: \d+\)$/.test(rootDisplayName)) {
+            rootDisplayName += ` (Total Count: ${jsonData.total_count})`;
+        }
+
+        return {
+            name: rootDisplayName,
+            originalStageName: "Root",
+            children: (jsonData.children || []).map(child => processNode(child, "Root"))
+        };
+    }
+
+    const treeData = transformData(initialJsonData);
+
+    // Auto-populated phaseColors: every depth-1 child of the root gets
+    // a stable colour from a bigger palette so all top-level dirs are
+    // distinguishable.
+    const PALETTE = [
+      ["#3498DB","#2980B9","#AED6F1"], ["#2ECC71","#27AE60","#A9DFBF"],
+      ["#E74C3C","#C0392B","#F5B7B1"], ["#9B59B6","#8E44AD","#D7BDE2"],
+      ["#F39C12","#D68910","#FAD7A0"], ["#1ABC9C","#117864","#A2D9CE"],
+      ["#34495E","#1B2631","#ABB2B9"], ["#E67E22","#BA4A00","#F5CBA7"],
+      ["#16A085","#0E6655","#A2D9CE"], ["#D35400","#A04000","#EDBB99"],
+      ["#7F8C8D","#566573","#D5DBDB"], ["#C0392B","#7B241C","#F5B7B1"],
+      ["#2E86C1","#1B4F72","#A9CCE3"], ["#28B463","#196F3D","#A9DFBF"],
+      ["#AF7AC5","#6C3483","#D2B4DE"],
+    ];
+    const phaseColors = { "Root": { fill: "#4A4A4A", stroke: "#333333", collapsedFill: "#6C757D" },
+                          "Default": { fill: "#BDC3C7", stroke: "#95A5A6", collapsedFill: "#ECF0F1" } };
+    (initialJsonData.children || []).forEach((c, i) => {
+      const pal = PALETTE[i % PALETTE.length];
+      phaseColors[c.name] = { fill: pal[0], stroke: pal[1], collapsedFill: pal[2] };
+    });
+
+    const levelSpecificPalettes = {
+      0: { fill: "#4A4A4A", stroke: "#333333", collapsedFill: "#6C757D" },
+      2: { fill: "#6ab04c", stroke: "#508a38", collapsedFill: "#a3d391" },
+      3: { fill: "#f0932b", stroke: "#d0730f", collapsedFill: "#f6c07e" },
+      4: { fill: "#be2edd", stroke: "#a01cb3", collapsedFill: "#e08bf2" },
+      5: { fill: "#00a8ff", stroke: "#007ac1", collapsedFill: "#74d2ff" },
+      6: { fill: "#e55039", stroke: "#c23620", collapsedFill: "#f09a8d" },
+      default: { fill: "#747d8c", stroke: "#57606f", collapsedFill: "#a4b0be" }
+    };
+
+    const svgElement = d3.select("#tree-svg");
+    const initialSvgWidth = +svgElement.attr("width");
+    const initialSvgHeight = +svgElement.attr("height");
+    const margin = { top: 40, right: 120, bottom: 80, left: 450 };
+    let width = initialSvgWidth - margin.left - margin.right;
+    let height = initialSvgHeight - margin.top - margin.bottom;
+    const duration = 500;
+    let nodeCounter = 0;
+    const g = svgElement.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+    const treemap = d3.tree().nodeSize([40, 0]);
+    let rootNode = d3.hierarchy(treeData, d => d.children);
+    rootNode.x0 = 0;
+    rootNode.y0 = 0;
+
+    if (rootNode.children) {
+      rootNode.children.forEach(d_child => {
+        if (d_child.children) { collapseBranch(d_child); }
+      });
+    }
+    updateTree(rootNode);
+
+    function collapseBranch(d) { if (d.children) { d._children = d.children; d._children.forEach(collapseBranch); d.children = null; } }
+    function expandBranch(d) { if (d._children) { d.children = d._children; d._children = null; } if (d.children) { d.children.forEach(expandBranch); } }
+    window.expandAll = () => { expandBranch(rootNode); updateTree(rootNode); };
+    window.collapseAll = () => { if (rootNode.children) { rootNode.children.forEach(collapseBranch); } updateTree(rootNode); };
+    window.resetView = () => { if (rootNode.children) { rootNode.children.forEach(d_child => { if (d_child.children || d_child._children) { collapseBranch(d_child); } }); } if (rootNode._children && !rootNode.children) { rootNode.children = rootNode._children; rootNode._children = null; } updateTree(rootNode); };
+
+    function updateTree(source) {
+      const treeLayoutData = treemap(rootNode);
+      let nodes = treeLayoutData.descendants();
+      let links = treeLayoutData.descendants().slice(1);
+
+      let minX = 0;
+      let maxX = 0;
+      if (nodes.length > 0) {
+        minX = d3.min(nodes, d => d.x);
+        maxX = d3.max(nodes, d => d.x);
+      }
+
+      let neededHeight = Math.max(initialSvgHeight, maxX - minX + margin.top + margin.bottom + 100);
+      svgElement.transition().duration(duration / 2).attr("height", neededHeight);
+      g.transition().duration(duration / 2).attr("transform", `translate(${margin.left},${margin.top - minX + 40})`);
+
+      nodes.forEach(d => { d.y = d.depth * 400; }); // Adjust horizontal separation if needed
+
+      const node = g.selectAll('g.node').data(nodes, d => d.id || (d.id = ++nodeCounter));
+      const nodeEnter = node.enter().append('g')
+        .attr('class', d => "node" + (d.children || d._children ? " node--internal" : " node--leaf") + (d._children ? " _children" : ""))
+        .attr('transform', d => `translate(${source.y0},${source.x0})`)
+        .on('click', (event, d) => { if (d.children) { d._children = d.children; d.children = null; } else if (d._children) { d.children = d._children; d._children = null; } updateTree(d); })
+        .style('cursor', d => (d.children || d._children) ? 'pointer' : 'default');
+
+      nodeEnter.append('circle').attr('r', 1e-6);
+
+      nodeEnter.append('text')
+        .attr('dy', '.35em')
+        .attr('x', d => d.children || d._children ? -14 : 14)
+        .attr('text-anchor', d => d.children || d._children ? 'end' : 'start')
+        .style("fill-opacity", 1e-6)
+        .call(wrapText, 380);
+
+      const nodeUpdate = nodeEnter.merge(node);
+      nodeUpdate.transition().duration(duration)
+        .attr('transform', d => `translate(${d.y},${d.x})`)
+        .attr('class', d => "node" + (d.children ? " node--internal" : " node--leaf") + (d._children ? " node--internal _children" : ""));
+
+      nodeUpdate.select('circle').attr('r', 8.5)
+        .style('fill', d => {
+            let palette;
+            if (d.depth === 0) {
+                palette = levelSpecificPalettes[0];
+            } else if (d.depth === 1) {
+                palette = phaseColors[d.data.originalStageName] || phaseColors.Default;
+            } else {
+                palette = levelSpecificPalettes[d.depth] || levelSpecificPalettes.default;
+            }
+            if (d._children) return palette.collapsedFill;
+            if (d.children) return palette.fill;
+            return "#fff";
+        })
+        .style('stroke', d => {
+            let palette;
+            if (d.depth === 0) {
+                palette = levelSpecificPalettes[0];
+            } else if (d.depth === 1) {
+                palette = phaseColors[d.data.originalStageName] || phaseColors.Default;
+            } else {
+                palette = levelSpecificPalettes[d.depth] || levelSpecificPalettes.default;
+            }
+            return palette.stroke;
+        });
+      nodeUpdate.select('text').style("fill-opacity", 1).call(wrapText, 380);
+
+      const nodeExit = node.exit().transition().duration(duration).attr('transform', d => `translate(${source.y},${source.x})`).remove();
+      nodeExit.select('circle').attr('r', 1e-6);
+      nodeExit.select('text').style('fill-opacity', 1e-6);
+
+      const link = g.selectAll('path.link').data(links, d => d.id);
+      const linkEnter = link.enter().insert('path', "g").attr('class', 'link').attr('d', d => { const o = { x: source.x0, y: source.y0 }; return diagonal(o, o); });
+
+      linkEnter.merge(link).transition().duration(duration).attr('d', d => diagonal(d, d.parent))
+        .style('stroke', d => {
+            const sourceNode = d.parent;
+            if (!sourceNode) return phaseColors.Default.stroke;
+            const l1AncestorName = sourceNode.data.originalStageName;
+            const colorPalette = phaseColors[l1AncestorName] || phaseColors.Default;
+            return colorPalette.stroke;
+        });
+      link.exit().transition().duration(duration).attr('d', d => { const o = { x: source.x, y: source.y }; return diagonal(o, o); }).remove();
+      nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
+    }
+
+    function diagonal(s, d) { return `M ${s.y} ${s.x} C ${(s.y + d.y) / 2} ${s.x}, ${(s.y + d.y) / 2} ${d.x}, ${d.y} ${d.x}`; }
+
+    function wrapText(textElements, maxWidth) {
+        const textPartColors = {
+            name: '#343a40',
+            count: '#0056b3'
+        };
+        const countRegex = /(\s\(Total Count: \d+\))$/;
+
+        textElements.each(function () {
+            const textD3 = d3.select(this);
+            const originalNodeText = textD3.datum().data.name;
+            const x = parseFloat(textD3.attr("x") || 0);
+            const initialDy = textD3.attr("dy");
+            const textAnchor = textD3.attr("text-anchor");
+            const lineHeight = 1.1;
+
+            textD3.text(null);
+
+            let namePart = originalNodeText;
+            let countPartText = "";
+
+            const countMatch = originalNodeText.match(countRegex);
+            if (countMatch && originalNodeText.endsWith(countMatch[0])) {
+                namePart = originalNodeText.substring(0, originalNodeText.length - countMatch[0].length).trim();
+                countPartText = countMatch[0].trim();
+            }
+
+            const tokens = [];
+            namePart.split(/\s+/).filter(Boolean).forEach(word => {
+                tokens.push({ text: word, type: 'name' });
+            });
+            if (countPartText) {
+                tokens.push({ text: countPartText, type: 'count' });
+            }
+
+            if (tokens.length === 0 && originalNodeText) {
+                tokens.push({ text: originalNodeText, type: 'name' });
+            }
+
+            let currentTspan = textD3.append("tspan").attr("x", x).attr("dy", initialDy);
+            if (textAnchor === "end") currentTspan.attr("text-anchor", "end");
+
+            let lineTokens = [];
+
+            for (let i = 0; i < tokens.length; i++) {
+                const tokenObj = tokens[i];
+
+                lineTokens.push(tokenObj);
+                currentTspan.text(lineTokens.map(t => t.text).join(" "));
+
+                if (currentTspan.node().getComputedTextLength() > maxWidth && lineTokens.length > 1) {
+                    lineTokens.pop();
+
+                    currentTspan.text(null);
+                    lineTokens.forEach((prevToken, idx) => {
+                        currentTspan.append("tspan")
+                            .text((idx > 0 ? " " : "") + prevToken.text)
+                            .style("fill", textPartColors[prevToken.type] || textPartColors.name)
+                            .style("font-weight", prevToken.type === 'count' ? "bold" : "normal");
+                    });
+
+                    lineTokens = [tokenObj];
+                    currentTspan = textD3.append("tspan").attr("x", x).attr("dy", lineHeight + "em");
+                    if (textAnchor === "end") currentTspan.attr("text-anchor", "end");
+                }
+            }
+
+            currentTspan.text(null);
+            lineTokens.forEach((token, idx) => {
+                currentTspan.append("tspan")
+                    .text((idx > 0 ? " " : "") + token.text)
+                    .style("fill", textPartColors[token.type] || textPartColors.name)
+                    .style("font-weight", token.type === 'count' ? "bold" : "normal");
+            });
+
+            if (textD3.selectAll("tspan > tspan").empty() && textD3.select("tspan").text().length === 0 && originalNodeText) {
+                let t = textD3.select("tspan");
+                let displayText = originalNodeText;
+                t.text(displayText).style("fill", textPartColors.name);
+                if (t.node() && t.node().getComputedTextLength() > maxWidth && displayText.length > 20) {
+                    let estimatedChars = Math.floor(maxWidth / (t.node().getComputedTextLength()/displayText.length) );
+                    displayText = displayText.substring(0, Math.max(0, estimatedChars - 3)) + "...";
+                    t.text(displayText);
+                }
+            }
+        });
+    }
+  </script>
+</body>
+</html>

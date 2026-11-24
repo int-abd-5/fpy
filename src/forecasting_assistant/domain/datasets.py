@@ -69,6 +69,7 @@ class QualityReport(BaseModel):
 
 class DatasetSearchQuery(BaseModel):
     target: str
+    prompt: str | None = None
     geography: list[str] = Field(default_factory=list)
     frequency: str | None = None
     history_start: date | None = None

@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import re
+from copy import deepcopy
 
-from forecasting_assistant.application.normalization import normalize_value
+from forecasting_assistant.application.normalization import (
+    extract_explicit_forecast_horizon,
+    extract_explicit_frequency,
+    normalize_extracted_value,
+)
 from forecasting_assistant.application.validation import validate_slot
 from forecasting_assistant.domain.models import (
     DialogueState,
@@ -36,6 +40,11 @@ _EXPLICIT_FORECAST_REQUEST_PATTERN = re.compile(
     r"\b(?:i|we)\s+(?:want|need|would like|am looking to|am looking for)\b"
     r".{0,100}\b(?:forecast|predict(?:ion|ed|ing)?|project(?:ion|ed|ing)?|"
     r"estimate(?:d|s|ing)?|time[- ]series)\b",
+    re.IGNORECASE,
+)
+_DIRECT_FORECAST_ACTION_PATTERN = re.compile(
+    r"\b(?:forecast|predict(?:ion|ed|ing)?|project(?:ion|ed|ing)?|"
+    r"estimate(?:d|s|ing)?)\b",
     re.IGNORECASE,
 )
 
@@ -119,7 +128,13 @@ def _resolved_intent(
     ]
     has_forecast_statement = any(_FORECAST_TERM_PATTERN.search(value) for value in forecast_statements)
     has_explicit_request = _EXPLICIT_FORECAST_REQUEST_PATTERN.search(current_message) is not None
-    if result.intent == Intent.AMBIGUOUS and (has_forecast_statement or has_explicit_request):
+    clear_forecast_language = (
+        _DIRECT_FORECAST_ACTION_PATTERN.search(current_message) is not None
+        and "?" not in current_message
+    )
+    if result.intent == Intent.AMBIGUOUS and (
+        has_forecast_statement or has_explicit_request or clear_forecast_language
+    ):
         return Intent.CREATE_FORECAST
     return result.intent
 
@@ -133,7 +148,14 @@ def _apply_update(
 ) -> None:
     current = state.slots[update.slot_id]
     definition = schema.get(update.slot_id)
-    normalized = deepcopy(normalize_value(definition, update.candidate_value))
+    normalized = deepcopy(
+        normalize_extracted_value(
+            definition,
+            update.candidate_value,
+            evidence_text=update.evidence_text,
+            current_message=state.turns[-1].user_message if state.turns else None,
+        )
+    )
 
     if current.confirmed_by_user and current.value != normalized and not result.correction_detected:
         current.status = SlotStatus.CONFLICTING
@@ -174,6 +196,28 @@ def apply_extraction(
     current_message: str,
 ) -> DialogueState:
     valid_updates = _check_contract(state, result, schema, current_message)
+    if turn_number == 1:
+        existing_update_ids = {update.slot_id for update in valid_updates}
+        for slot_id, extractor in (
+            ("frequency", extract_explicit_frequency),
+            ("forecast_horizon", extract_explicit_forecast_horizon),
+        ):
+            slot = state.slots[slot_id]
+            if slot.status != SlotStatus.UNMENTIONED or slot_id in existing_update_ids:
+                continue
+            extracted = extractor(current_message)
+            if extracted is None:
+                continue
+            value, evidence = extracted
+            valid_updates.append(
+                SlotUpdate(
+                    slot_id=slot_id,
+                    candidate_value=value,
+                    status=SlotStatus.PROVIDED,
+                    confidence=1.0,
+                    evidence_text=evidence,
+                )
+            )
     updated_state = deepcopy(state)
     resolved_intent = _resolved_intent(state, result, valid_updates, current_message)
     forecasting_intent_locked = state.intent == Intent.CREATE_FORECAST

@@ -1,0 +1,140 @@
+[
+  {
+    "step": "baseline",
+    "branch": "codex/pilot-deterministic-interview",
+    "timestamp": "2026-10-20",
+    "automated_test_command": "./.venv/bin/python -m pytest -q",
+    "automated_test_result": "258 passed in 13.75s",
+    "automated_test_exit_code": 0,
+    "live_baseline_report": "evaluation/live_workflow_results.json",
+    "live_baseline_summary": {
+      "scenario_count": 6,
+      "interviews_completed": 1,
+      "interviews_hit_turn_cap": 5,
+      "catalog_fetches_succeeded": 1,
+      "scenario_turn_counts": {
+        "catalog-pakistan-inflation": 8,
+        "catalog-india-life-expectancy-clarification": 8,
+        "catalog-bitcoin-daily": 8,
+        "catalog-pakistan-gdp": 5,
+        "upload-store-sales": 8,
+        "catalog-hierarchical-energy": 8
+      },
+      "observed_failures": [
+        "5 years and 30 days were repeatedly rejected after provider extraction returned malformed numeric horizon values.",
+        "Catalog answers were sometimes followed by an intent or source question again.",
+        "A successful GDP path produced a malformed target string and omitted explicit annual frequency in the registry query.",
+        "The 8-turn cap prevented five scenarios from reaching confirmation and dataset discovery."
+      ]
+    }
+  },
+  {
+    "step": "pending-slot-answer-precedence-and-duration-normalization",
+    "timestamp": "2026-10-20",
+    "focused_test_command": "./.venv/bin/python -m pytest -q tests/unit/test_state_reducer.py::test_numeric_duration_candidate_uses_unit_from_evidence tests/integration/test_elicitation_flow.py::test_pending_answer_overrides_conflicting_provider_update_for_same_slot",
+    "focused_test_result": "2 passed in 0.53s",
+    "focused_test_exit_code": 0,
+    "full_test_command": "./.venv/bin/python -m pytest -q",
+    "full_test_result": "260 passed in 3.01s",
+    "full_test_exit_code": 0,
+    "behavior_verified": [
+      "A provider numeric horizon candidate plus 5 years evidence becomes {periods: 5.0, unit: year}.",
+      "A valid answer to the selected pending slot overrides a conflicting provider update for that same slot.",
+      "Existing tests remain green."
+    ]
+  },
+  {
+    "step": "forecast-intent-lock-and-catalog-source-guard",
+    "timestamp": "2026-10-20",
+    "focused_test_command": "./.venv/bin/python -m pytest -q tests/integration/test_elicitation_flow.py::test_clear_forecast_request_locks_intent_when_provider_returns_no_updates tests/integration/test_elicitation_flow.py::test_selected_intent_question_accepts_yes_confirmation tests/integration/test_elicitation_flow.py::test_data_list_variants_fill_catalog_source_mode_on_first_try tests/integration/test_elicitation_flow.py::test_catalog_answer_does_not_reopen_intent_question",
+    "focused_test_result": "8 passed in 0.59s",
+    "focused_test_exit_code": 0,
+    "full_test_command": "./.venv/bin/python -m pytest -q",
+    "full_test_result": "261 passed in 2.46s",
+    "full_test_exit_code": 0,
+    "behavior_verified": [
+      "A direct forecast request locks create_forecast even when the provider returns ambiguous intent with no updates.",
+      "Catalog phrases continue to fill source_mode=catalog on the first valid answer.",
+      "A generic phrase such as complete forecasting requirements still allows the explicit intent question when expected.",
+      "Existing intent and catalog tests remain green."
+    ]
+  },
+  {
+    "step": "registry-query-value-sanitization",
+    "timestamp": "2026-10-20",
+    "focused_test_command": "./.venv/bin/python -m pytest -q tests/unit/test_dataset_query.py::test_query_unwraps_text_wrappers_and_duration_unit_aliases tests/unit/test_dataset_query.py::test_query_from_specification_preserves_prompt_separately_from_registry_target",
+    "focused_test_result": "2 passed in 0.07s",
+    "focused_test_exit_code": 0,
+    "full_test_command": "./.venv/bin/python -m pytest -q",
+    "full_test_result": "262 passed in 2.38s",
+    "full_test_exit_code": 0,
+    "behavior_verified": [
+      "Known text wrappers are converted to plain target and prompt text before registry query construction.",
+      "Plural duration unit keys are canonicalized and annual frequency is preserved.",
+      "Explicit Pakistan geography remains in the query.",
+      "Existing dataset-query tests remain green."
+    ]
+  },
+  {
+    "step": "explicit-initial-time-cue-recovery",
+    "timestamp": "2026-10-20",
+    "focused_test_command": "./.venv/bin/python -m pytest -q tests/unit/test_state_reducer.py::test_initial_time_phrases_fill_unmentioned_frequency_and_horizon tests/unit/test_validation.py::test_normalization_converts_natural_language_durations tests/integration/test_elicitation_flow.py::test_pending_answer_overrides_conflicting_provider_update_for_same_slot",
+    "focused_test_result": "8 passed in 0.53s",
+    "focused_test_exit_code": 0,
+    "full_test_command": "./.venv/bin/python -m pytest -q",
+    "full_test_result": "263 passed in 2.65s",
+    "full_test_exit_code": 0,
+    "behavior_verified": [
+      "An initial annually phrase fills frequency as one year.",
+      "An initial next 5 years phrase fills forecast_horizon as five years.",
+      "Existing duration parsing and pending-answer precedence remain green."
+    ]
+  },
+  {
+    "step": "final-live-six-scenario-evaluation",
+    "timestamp": "2026-10-20",
+    "command": "./.venv/bin/python scripts/run_live_workflows.py --scenario-file evaluation/live_workflow_scenarios.json --output evaluation/live_workflow_results_pilot_final.json",
+    "result_file": "evaluation/live_workflow_results_pilot_final.json",
+    "scenario_count": 6,
+    "baseline": {
+      "completed_interviews": 1,
+      "validated_fetches": 1,
+      "average_turns": 7.5,
+      "repeated_user_answer_retries": 11,
+      "average_runtime_seconds": 53.22
+    },
+    "pilot": {
+      "completed_interviews": 5,
+      "eligible_recommendations": 5,
+      "validated_fetches": 2,
+      "average_turns": 5.5,
+      "repeated_user_answer_retries": 0,
+      "average_runtime_seconds": 28.26,
+      "frequency_values": {
+        "catalog-pakistan-inflation": "annual",
+        "catalog-india-life-expectancy-clarification": "annual",
+        "catalog-bitcoin-daily": "daily",
+        "catalog-pakistan-gdp": null,
+        "catalog-hierarchical-energy": "monthly"
+      },
+      "remaining_external_or_scope_issues": [
+        "The WHO selected endpoint returned HTTP 502 during fetch.",
+        "The uploaded-store-sales scenario did not reach confirmation within the existing eight-turn evaluation cap."
+      ]
+    },
+    "decision": "keep_on_pilot_branch_do_not_merge_to_main_yet",
+    "reason": "The state and normalization changes remove the repeated-answer loop and materially improve completion, but upload-flow coverage and catalog matching still need a separate iteration."
+  },
+  {
+    "step": "final-verification",
+    "timestamp": "2026-10-20",
+    "automated_test_command": "./.venv/bin/python -m pytest -q",
+    "automated_test_result": "263 passed in 2.50s",
+    "automated_test_exit_code": 0,
+    "focused_lint_command": "./.venv/bin/python -m ruff check <pilot implementation and test files> --select F,I",
+    "focused_lint_result": "All checks passed!",
+    "focused_lint_exit_code": 0,
+    "artifact_validation": "git diff --check and JSON parsing passed",
+    "repository_wide_lint_note": "The full repository Ruff check still reports pre-existing style findings outside the pilot scope; no whole-repository lint-clean claim is made."
+  }
+]

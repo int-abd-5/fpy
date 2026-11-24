@@ -151,6 +151,32 @@ async def test_forecasting_language_promotes_ambiguous_initial_intent() -> None:
 
 
 @pytest.mark.asyncio
+async def test_clear_forecast_request_locks_intent_when_provider_returns_no_updates() -> None:
+    client = FakeLLMClient(
+        [ExtractorResult(intent=Intent.AMBIGUOUS, intent_confidence=0.5)],
+        [
+            QuestionOutput(
+                question="How will the data be provided? Example answer: choose from our data list."
+            )
+        ],
+    )
+    engine, repository, dialogue_id = await _start(client)
+
+    result = await engine.handle_user_message(
+        dialogue_id,
+        "Forecast Pakistan's inflation rate using the catalog.",
+    )
+
+    state = repository.load_state(dialogue_id)
+    assert state is not None
+    assert state.intent == Intent.CREATE_FORECAST
+    assert state.slots["intent"].value == Intent.CREATE_FORECAST.value
+    assert client.ask_requests[0].slot_id != "intent"
+    assert state.slots["source_mode"].value == "catalog"
+    assert "time-series forecast" not in result.assistant_message
+
+
+@pytest.mark.asyncio
 async def test_catalog_answer_does_not_reopen_intent_question() -> None:
     initial = ExtractorResult(
         intent=Intent.AMBIGUOUS,
@@ -368,6 +394,36 @@ async def test_short_answer_is_applied_to_the_slot_asked_by_the_previous_questio
 
     assert result.state.slots["target_column"].value == "revenue"
     assert result.state.slots["target_column"].status == SlotStatus.PROVIDED
+
+
+@pytest.mark.asyncio
+async def test_pending_answer_overrides_conflicting_provider_update_for_same_slot() -> None:
+    client = FakeLLMClient(
+        [
+            _complete_result(omit={"forecast_horizon"}),
+            ExtractorResult(
+                intent=Intent.CREATE_FORECAST,
+                intent_confidence=0.99,
+                updates=[_update("forecast_horizon", 5, evidence="5")],
+            ),
+        ],
+        [
+            QuestionOutput(
+                question="How far into the future should we predict? Example answer: 12 months."
+            )
+        ],
+    )
+    engine, _, dialogue_id = await _start(client)
+
+    await engine.handle_user_message(dialogue_id, MESSAGE)
+    result = await engine.handle_user_message(dialogue_id, "5 years")
+
+    assert result.state.slots["forecast_horizon"].value == {
+        "periods": 5.0,
+        "unit": "year",
+    }
+    assert result.state.slots["forecast_horizon"].status == SlotStatus.PROVIDED
+    assert result.state.slots["forecast_horizon"].validation_errors == []
 
 
 @pytest.mark.asyncio

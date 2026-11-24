@@ -1,0 +1,113 @@
+[
+  {
+    "scenario_id": "catalog-pakistan-inflation",
+    "title": "Pakistan inflation from the catalog",
+    "initial_message": "I want to forecast Pakistan's inflation rate annually for the next 5 years using your data catalog.",
+    "answers": {
+      "intent": "yes",
+      "problem_statement": "forecast Pakistan's inflation rate",
+      "target_description": "Pakistan's inflation rate",
+      "target_unit": "percent",
+      "frequency": "once per year",
+      "forecast_horizon": "5 years",
+      "dataset_type": "one overall series",
+      "output_granularity": "one value per year",
+      "contains_sensitive_data": "no",
+      "source_mode": "your data catalog"
+    }
+  },
+  {
+    "scenario_id": "catalog-india-life-expectancy-clarification",
+    "title": "India life expectancy with a clarification request",
+    "initial_message": "Please predict India's overall life expectancy each year for the next 5 years from the data catalog.",
+    "clarify_after_first_question": true,
+    "answers": {
+      "intent": "yes",
+      "problem_statement": "forecast India's overall life expectancy",
+      "target_description": "India's overall life expectancy",
+      "target_unit": "years of life expectancy",
+      "frequency": "annual",
+      "forecast_horizon": "5 years",
+      "dataset_type": "one overall series",
+      "output_granularity": "one value per year",
+      "contains_sensitive_data": "no",
+      "source_mode": "the catalog"
+    }
+  },
+  {
+    "scenario_id": "catalog-bitcoin-daily",
+    "title": "Bitcoin daily price forecast",
+    "initial_message": "Forecast the Bitcoin price every day for the next 30 days using the catalog, with one price for Bitcoin in USD.",
+    "answers": {
+      "intent": "yes",
+      "problem_statement": "forecast Bitcoin price",
+      "target_description": "Bitcoin price",
+      "target_unit": "USD",
+      "frequency": "daily",
+      "forecast_horizon": "30 days",
+      "dataset_type": "one overall series",
+      "output_granularity": "one value per day",
+      "contains_sensitive_data": "no",
+      "source_mode": "from your data list"
+    }
+  },
+  {
+    "scenario_id": "catalog-pakistan-gdp",
+    "title": "Pakistan GDP growth forecast",
+    "initial_message": "I need a forecast of Pakistan's GDP growth for the next 3 years using the system catalog.",
+    "answers": {
+      "intent": "yes",
+      "problem_statement": "forecast Pakistan's GDP growth",
+      "target_description": "Pakistan's GDP growth",
+      "target_unit": "percent",
+      "frequency": "annual",
+      "forecast_horizon": "3 years",
+      "dataset_type": "one overall series",
+      "output_granularity": "one value per year",
+      "contains_sensitive_data": "no",
+      "source_mode": "catalog"
+    }
+  },
+  {
+    "scenario_id": "upload-store-sales",
+    "title": "Uploaded store sales dataset",
+    "initial_message": "I want to forecast store sales monthly for the next 12 months from my uploaded file.",
+    "uploaded_file": {
+      "filename": "store_sales.csv",
+      "columns": ["date", "store", "product", "sales"],
+      "csv_rows": 40
+    },
+    "answers": {
+      "intent": "yes",
+      "problem_statement": "forecast store sales",
+      "target_description": "store sales",
+      "target_column": "sales",
+      "time_column": "date",
+      "target_unit": "units",
+      "frequency": "monthly",
+      "forecast_horizon": "12 months",
+      "dataset_type": "several separate items",
+      "output_granularity": "one result per month for each store and product",
+      "contains_sensitive_data": "no",
+      "source_mode": "upload the file",
+      "source_reference": "store_sales.csv"
+    }
+  },
+  {
+    "scenario_id": "catalog-hierarchical-energy",
+    "title": "Hierarchical Pakistan energy demand",
+    "initial_message": "Forecast Pakistan electricity demand monthly for the next 12 months from the catalog, across regions and facilities.",
+    "answers": {
+      "intent": "yes",
+      "problem_statement": "forecast Pakistan electricity demand",
+      "target_description": "Pakistan electricity demand",
+      "target_unit": "megawatt hours",
+      "frequency": "monthly",
+      "forecast_horizon": "12 months",
+      "dataset_type": "groups with levels",
+      "output_granularity": "one result per month for each region and facility",
+      "contains_sensitive_data": "no",
+      "source_mode": "use the catalog"
+    }
+  }
+]

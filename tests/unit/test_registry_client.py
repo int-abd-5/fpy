@@ -89,6 +89,65 @@ def test_resolve_posts_explicit_registry_payload_without_empty_optional_values()
     }
 
 
+def test_resolve_emits_redacted_request_and_response_trace() -> None:
+    transport = FakeTransport(
+        [
+            RegistryResponse(
+                200,
+                {
+                    "target_sources": [],
+                    "companion_sources": [],
+                    "lineage": [],
+                    "warnings": [],
+                },
+            )
+        ]
+    )
+    events: list[tuple[str, dict[str, Any]]] = []
+    client = RegistryClient(
+        "https://registry.example.com",
+        api_key="do-not-log-this-secret",
+        transport=transport,
+        trace_sink=lambda stage, payload: events.append((stage, payload)),
+    )
+
+    client.resolve({"prompt": "Forecast Pakistan inflation", "target": "macro.inflation"})
+
+    assert [stage for stage, _ in events] == [
+        "registry.resolve.request",
+        "registry.resolve.response",
+    ]
+    assert events[0][1] == {
+        "attempt": 1,
+        "method": "POST",
+        "path": "/resolve",
+        "payload": {"prompt": "Forecast Pakistan inflation", "target": "macro.inflation"},
+    }
+    assert events[1][1]["attempt"] == 1
+    assert events[1][1]["status_code"] == 200
+    assert "do-not-log-this-secret" not in str(events)
+
+
+def test_resolve_emits_error_trace_when_registry_cannot_be_reached() -> None:
+    transport = FakeTransport([TimeoutError("catalog timeout")])
+    events: list[tuple[str, dict[str, Any]]] = []
+    client = RegistryClient(
+        "https://registry.example.com",
+        transport=transport,
+        max_retries=0,
+        trace_sink=lambda stage, payload: events.append((stage, payload)),
+    )
+
+    with pytest.raises(RegistryUnavailableError):
+        client.resolve({"prompt": "Forecast Pakistan inflation"})
+
+    assert [stage for stage, _ in events] == [
+        "registry.resolve.request",
+        "registry.resolve.error",
+    ]
+    assert events[1][1]["error_type"] == "TimeoutError"
+
+
 def test_health_requires_status_ok_and_db_ok() -> None:
     unhealthy = FakeTransport([RegistryResponse(200, {"status": "ok", "db_ok": False})])
     client = RegistryClient("https://registry.example.com", transport=unhealthy)

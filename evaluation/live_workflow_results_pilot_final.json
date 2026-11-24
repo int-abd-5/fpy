@@ -1,0 +1,486 @@
+[
+  {
+    "scenario_id": "catalog-pakistan-inflation",
+    "title": "Pakistan inflation from the catalog",
+    "dialogue_id": "d853278a-bc7e-41e1-acd7-7606c2e727a7",
+    "turn_count": 5,
+    "total_elapsed_ms": 22067.08,
+    "transcript": [
+      {
+        "user": "I want to forecast Pakistan's inflation rate annually for the next 5 years using your data catalog.",
+        "assistant": "In plain words, what does the number you want to predict (the target) represent for Pakistan's inflation rate (e.g., consumer price index change, headline inflation, or core inflation)? Example answer: Bitcoin daily closing price",
+        "elapsed_ms": 9468.58,
+        "pending_slot": "target_description",
+        "ready": false
+      },
+      {
+        "user": "Pakistan's inflation rate",
+        "assistant": "What unit is Pakistan's inflation rate measured in (for example: percent, index points, or CPI index level)? Example answer: USD per Bitcoin",
+        "elapsed_ms": 5182.57,
+        "pending_slot": "target_unit",
+        "ready": false
+      },
+      {
+        "user": "percent",
+        "assistant": "Should forecast results be returned at the country-year level (one annual value for Pakistan each year) or grouped differently by time or items (explain briefly)? Example answer: annual",
+        "elapsed_ms": 4657.0,
+        "pending_slot": "output_granularity",
+        "ready": false
+      },
+      {
+        "user": "one value per year",
+        "assistant": "I understand that the target is Pakistan's inflation rate, for Pakistan, using our data catalog, every 1 year, for the next 5 years, with values measured in percent, reported as one value per year. Can I confirm these requirements? Example answer: yes.",
+        "elapsed_ms": 2735.17,
+        "pending_slot": null,
+        "ready": true
+      },
+      {
+        "user": "yes",
+        "assistant": "Confirmed. The forecasting requirements are complete.",
+        "elapsed_ms": 21.85,
+        "pending_slot": null,
+        "ready": true
+      }
+    ],
+    "failure": null,
+    "discovery_elapsed_ms": 1626.45,
+    "query": {
+      "target": "Pakistan's inflation rate Forecast Pakistan's inflation rate annually for the next 5 years",
+      "prompt": "Forecast Pakistan's inflation rate annually for the next 5 years Pakistan's inflation rate",
+      "geography": [
+        "Pakistan"
+      ],
+      "frequency": "annual",
+      "history_start": null,
+      "history_end": null,
+      "minimum_training_points": 30,
+      "maximum_staleness_days": null,
+      "purpose": "production",
+      "source_mode": "catalog",
+      "source_reference": null,
+      "license_hint": null,
+      "contains_sensitive_data": false,
+      "user_id": "live-evaluation-user",
+      "latitude": null,
+      "longitude": null
+    },
+    "recommendations": [],
+    "unavailable_count": 0,
+    "source_errors": {},
+    "fetch_status": "not_attempted_no_eligible_recommendation"
+  },
+  {
+    "scenario_id": "catalog-india-life-expectancy-clarification",
+    "title": "India life expectancy with a clarification request",
+    "dialogue_id": "85b33294-1786-49fe-a8c0-e4c6380cec99",
+    "turn_count": 5,
+    "total_elapsed_ms": 17726.68,
+    "transcript": [
+      {
+        "user": "Please predict India's overall life expectancy each year for the next 5 years from the data catalog.",
+        "assistant": "What unit is life expectancy measured in (for example, years)? Example answer: USD per Bitcoin",
+        "elapsed_ms": 6400.93,
+        "pending_slot": "target_unit",
+        "ready": false
+      },
+      {
+        "user": "What do you mean by that?",
+        "assistant": "By \"unit\" I mean the measurement used for life expectancy — basically what each number represents. For life expectancy the usual unit is \"years\" (for example, 72.5 would mean 72.5 years). \n\nCurrent question: What unit is life expectancy measured in (for example, years)? Example answer: USD per Bitcoin\n\nExample answer you can give: years",
+        "elapsed_ms": 2041.46,
+        "pending_slot": "target_unit",
+        "ready": false
+      },
+      {
+        "user": "years of life expectancy",
+        "assistant": "Should the forecast be reported yearly (one value per year) or with a different grouping by time or subgroup (for example, annual by gender)? Example answer: annual",
+        "elapsed_ms": 6494.26,
+        "pending_slot": "output_granularity",
+        "ready": false
+      },
+      {
+        "user": "one value per year",
+        "assistant": "I understand that the target is life expectancy (overall), for India, using our data catalog, every 1 year, for the next 5 years, with values measured in years of life expectancy, reported as one value per year. Can I confirm these requirements? Example answer: yes.",
+        "elapsed_ms": 2765.13,
+        "pending_slot": null,
+        "ready": true
+      },
+      {
+        "user": "yes",
+        "assistant": "Confirmed. The forecasting requirements are complete.",
+        "elapsed_ms": 23.23,
+        "pending_slot": null,
+        "ready": true
+      }
+    ],
+    "failure": null,
+    "discovery_elapsed_ms": 1879.02,
+    "query": {
+      "target": "life expectancy (overall) overall life expectancy each year",
+      "prompt": "overall life expectancy each year life expectancy (overall)",
+      "geography": [
+        "India"
+      ],
+      "frequency": "annual",
+      "history_start": null,
+      "history_end": null,
+      "minimum_training_points": 30,
+      "maximum_staleness_days": null,
+      "purpose": "production",
+      "source_mode": "catalog",
+      "source_reference": null,
+      "license_hint": null,
+      "contains_sensitive_data": false,
+      "user_id": "live-evaluation-user",
+      "latitude": null,
+      "longitude": null
+    },
+    "recommendations": [
+      {
+        "candidate_id": "71632ce08135403c7ac52725",
+        "title": "WHO GHO - Healthy life expectancy (HALE) (WHOSIS_000002)",
+        "publisher": "World Health Organization - Global Health Observatory",
+        "score": 67.2,
+        "eligible": true,
+        "limitations": [
+          "Dependency scores are priors or measured associations, not causal claims."
+        ],
+        "source_url": "https://ghoapi.azureedge.net/api/WHOSIS_000002"
+      },
+      {
+        "candidate_id": "a4ef0141e38925434b0f40b8",
+        "title": "WHO GHO - Life expectancy at birth (WHOSIS_000001)",
+        "publisher": "World Health Organization - Global Health Observatory",
+        "score": 67.2,
+        "eligible": true,
+        "limitations": [
+          "Dependency scores are priors or measured associations, not causal claims."
+        ],
+        "source_url": "https://ghoapi.azureedge.net/api/WHOSIS_000001"
+      },
+      {
+        "candidate_id": "3163834c19677e0e52cc74b1",
+        "title": "World Bank - Life expectancy at birth (SP.DYN.LE00.IN)",
+        "publisher": "World Bank",
+        "score": 63.8,
+        "eligible": true,
+        "limitations": [
+          "Dependency scores are priors or measured associations, not causal claims."
+        ],
+        "source_url": "https://api.worldbank.org/v2/country/all/indicator/SP.DYN.LE00.IN?format=json&per_page=100&date=2015:2024"
+      }
+    ],
+    "unavailable_count": 1,
+    "source_errors": {},
+    "selected_candidate_id": "71632ce08135403c7ac52725",
+    "fetch_status": "failed",
+    "fetch_error": "DatasetDownloadError: dataset source returned HTTP 502"
+  },
+  {
+    "scenario_id": "catalog-bitcoin-daily",
+    "title": "Bitcoin daily price forecast",
+    "dialogue_id": "2448e999-ace2-43c3-b6b2-d456678bc303",
+    "turn_count": 4,
+    "total_elapsed_ms": 12340.02,
+    "transcript": [
+      {
+        "user": "Forecast the Bitcoin price every day for the next 30 days using the catalog, with one price for Bitcoin in USD.",
+        "assistant": "What would you like the system to predict (e.g., forecast Bitcoin daily closing price)? Example answer: forecast Bitcoin daily closing price",
+        "elapsed_ms": 6345.93,
+        "pending_slot": "problem_statement",
+        "ready": false
+      },
+      {
+        "user": "forecast Bitcoin price",
+        "assistant": "How should results be grouped by time and item (for example, one row per day with a single Bitcoin price)? Example answer: daily",
+        "elapsed_ms": 3994.51,
+        "pending_slot": "output_granularity",
+        "ready": false
+      },
+      {
+        "user": "one value per day",
+        "assistant": "I understand that the target is Bitcoin price, using our data catalog, every 1 day, for the next 30 days, with values measured in USD, reported as one value per day. Can I confirm these requirements? Example answer: yes.",
+        "elapsed_ms": 1976.29,
+        "pending_slot": null,
+        "ready": true
+      },
+      {
+        "user": "yes",
+        "assistant": "Confirmed. The forecasting requirements are complete.",
+        "elapsed_ms": 22.07,
+        "pending_slot": null,
+        "ready": true
+      }
+    ],
+    "failure": null,
+    "discovery_elapsed_ms": 2133.77,
+    "query": {
+      "target": "Bitcoin price forecast Bitcoin price",
+      "prompt": "forecast Bitcoin price Bitcoin price",
+      "geography": [],
+      "frequency": "daily",
+      "history_start": null,
+      "history_end": null,
+      "minimum_training_points": 30,
+      "maximum_staleness_days": null,
+      "purpose": "production",
+      "source_mode": "catalog",
+      "source_reference": null,
+      "license_hint": null,
+      "contains_sensitive_data": false,
+      "user_id": "live-evaluation-user",
+      "latitude": null,
+      "longitude": null
+    },
+    "recommendations": [
+      {
+        "candidate_id": "7f9d6231286c3750441eba28",
+        "title": "Coinbase - BTC-USD daily candles",
+        "publisher": "Coinbase Exchange",
+        "score": 58.67,
+        "eligible": true,
+        "limitations": [
+          "Dependency scores are priors or measured associations, not causal claims."
+        ],
+        "source_url": "https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=86400"
+      }
+    ],
+    "unavailable_count": 0,
+    "source_errors": {},
+    "selected_candidate_id": "7f9d6231286c3750441eba28",
+    "fetch_status": "succeeded",
+    "dataset_version": {
+      "sha256": "2e4b71c3ec03b6c3720722562e93e21e8efe7539a653c7a91dcf616d742d18c5",
+      "content_type": "application/json",
+      "byte_size": 21449,
+      "source_version": "W/\"25db-w0upljuiMfVthqGF4/vQlcWw4jA\""
+    }
+  },
+  {
+    "scenario_id": "catalog-pakistan-gdp",
+    "title": "Pakistan GDP growth forecast",
+    "dialogue_id": "53421d12-96db-4244-aa41-844a3fa5d8f1",
+    "turn_count": 5,
+    "total_elapsed_ms": 15483.93,
+    "transcript": [
+      {
+        "user": "I need a forecast of Pakistan's GDP growth for the next 3 years using the system catalog.",
+        "assistant": "What does the target variable represent (for example, is it year-over-year GDP growth rate, quarter-over-quarter growth, nominal GDP in local currency, etc.)? Example answer: Bitcoin daily closing price",
+        "elapsed_ms": 5471.67,
+        "pending_slot": "target_description",
+        "ready": false
+      },
+      {
+        "user": "Pakistan's GDP growth",
+        "assistant": "What unit is the target measured in (for example, percent growth rate, index points, or currency amount)? Example answer: USD per Bitcoin",
+        "elapsed_ms": 3954.62,
+        "pending_slot": "target_unit",
+        "ready": false
+      },
+      {
+        "user": "percent",
+        "assistant": "How should results be grouped by time and item (for example, one value per quarter for Pakistan as a whole, or separate values per province each quarter)? Example answer: one result per day for each item",
+        "elapsed_ms": 3988.97,
+        "pending_slot": "output_granularity",
+        "ready": false
+      },
+      {
+        "user": "one value per year",
+        "assistant": "I understand that the target is Pakistan's GDP growth, using our data catalog, for the next 3 years, with values measured in percent, reported as one value per year. Can I confirm these requirements? Example answer: yes.",
+        "elapsed_ms": 2045.11,
+        "pending_slot": null,
+        "ready": true
+      },
+      {
+        "user": "yes",
+        "assistant": "Confirmed. The forecasting requirements are complete.",
+        "elapsed_ms": 22.08,
+        "pending_slot": null,
+        "ready": true
+      }
+    ],
+    "failure": null,
+    "discovery_elapsed_ms": 2776.9,
+    "query": {
+      "target": "Pakistan's GDP growth Pakistan's GDP growth",
+      "prompt": "Pakistan's GDP growth Pakistan's GDP growth",
+      "geography": [],
+      "frequency": null,
+      "history_start": null,
+      "history_end": null,
+      "minimum_training_points": 30,
+      "maximum_staleness_days": null,
+      "purpose": "production",
+      "source_mode": "catalog",
+      "source_reference": null,
+      "license_hint": null,
+      "contains_sensitive_data": false,
+      "user_id": "live-evaluation-user",
+      "latitude": null,
+      "longitude": null
+    },
+    "recommendations": [
+      {
+        "candidate_id": "3de6af370c1e00ed85168ee6",
+        "title": "World Bank - GDP growth, annual % (NY.GDP.MKTP.KD.ZG)",
+        "publisher": "World Bank",
+        "score": 58.5,
+        "eligible": true,
+        "limitations": [
+          "Dependency scores are priors or measured associations, not causal claims."
+        ],
+        "source_url": "https://api.worldbank.org/v2/country/all/indicator/NY.GDP.MKTP.KD.ZG?format=json&per_page=100&date=2015:2025"
+      }
+    ],
+    "unavailable_count": 0,
+    "source_errors": {},
+    "selected_candidate_id": "3de6af370c1e00ed85168ee6",
+    "fetch_status": "succeeded",
+    "dataset_version": {
+      "sha256": "7196d4dc5cf4ecd921579b2ef301cd808e0b30cf2019355afc58893dff86c11c",
+      "content_type": "application/json",
+      "byte_size": 23509,
+      "source_version": "Tue, 20 Oct 2026 03:07:05 GMT"
+    }
+  },
+  {
+    "scenario_id": "upload-store-sales",
+    "title": "Uploaded store sales dataset",
+    "dialogue_id": "f77371bf-7e7d-478e-ac33-0a2536b7a4c7",
+    "turn_count": 8,
+    "total_elapsed_ms": 69064.57,
+    "transcript": [
+      {
+        "user": "I want to forecast store sales monthly for the next 12 months from my uploaded file.",
+        "assistant": "Which column tells us when each observation happened? Example answer: date.",
+        "elapsed_ms": 9198.72,
+        "pending_slot": "time_column",
+        "ready": false
+      },
+      {
+        "user": "date",
+        "assistant": "Which column contains the value you want to predict? Example answer: date.",
+        "elapsed_ms": 9220.24,
+        "pending_slot": "target_column",
+        "ready": false
+      },
+      {
+        "user": "sales",
+        "assistant": "What would you like the system to predict? Example answer: forecast Bitcoin daily closing price.",
+        "elapsed_ms": 8379.49,
+        "pending_slot": "problem_statement",
+        "ready": false
+      },
+      {
+        "user": "forecast store sales",
+        "assistant": "What does the target variable represent? Example answer: Bitcoin daily closing price.",
+        "elapsed_ms": 8936.21,
+        "pending_slot": "target_description",
+        "ready": false
+      },
+      {
+        "user": "store sales",
+        "assistant": "Does your data cover one item, several separate items, or groups with levels? Example answer: several separate items.",
+        "elapsed_ms": 8331.03,
+        "pending_slot": "dataset_type",
+        "ready": false
+      },
+      {
+        "user": "several separate items",
+        "assistant": "What unit is the target measured in? Example answer: USD per Bitcoin.",
+        "elapsed_ms": 8031.62,
+        "pending_slot": "target_unit",
+        "ready": false
+      },
+      {
+        "user": "units",
+        "assistant": "How should results be grouped by time and item? Example answer: monthly.",
+        "elapsed_ms": 8410.09,
+        "pending_slot": "output_granularity",
+        "ready": false
+      },
+      {
+        "user": "one result per month for each store and product",
+        "assistant": "Which column identifies each item? Example answer: date, store, product.",
+        "elapsed_ms": 8552.37,
+        "pending_slot": "series_id_columns",
+        "ready": false
+      }
+    ],
+    "failure": "dialogue did not reach explicit confirmation within 8 turns"
+  },
+  {
+    "scenario_id": "catalog-hierarchical-energy",
+    "title": "Hierarchical Pakistan energy demand",
+    "dialogue_id": "461d573f-e681-4da3-b6d7-b8e4c231fcef",
+    "turn_count": 6,
+    "total_elapsed_ms": 32861.2,
+    "transcript": [
+      {
+        "user": "Forecast Pakistan electricity demand monthly for the next 12 months from the catalog, across regions and facilities.",
+        "assistant": "What would you like the system to predict (a short description like “monthly electricity demand for each region and facility”)? Example answer: forecast Bitcoin daily closing price",
+        "elapsed_ms": 6395.85,
+        "pending_slot": "problem_statement",
+        "ready": false
+      },
+      {
+        "user": "forecast Pakistan electricity demand",
+        "assistant": "What does the target variable represent (for example: total monthly electricity demand in megawatt-hours for each region or facility) ? Example answer: Bitcoin daily closing price",
+        "elapsed_ms": 6694.46,
+        "pending_slot": "target_description",
+        "ready": false
+      },
+      {
+        "user": "Pakistan electricity demand",
+        "assistant": "What unit is the target measured in (for example: megawatt-hours per month for each region or facility)? Example answer: USD per Bitcoin",
+        "elapsed_ms": 4927.83,
+        "pending_slot": "target_unit",
+        "ready": false
+      },
+      {
+        "user": "megawatt hours",
+        "assistant": "How should results be grouped by time and item (for example: monthly totals for each region and each facility) ? Example answer: monthly",
+        "elapsed_ms": 8754.2,
+        "pending_slot": "output_granularity",
+        "ready": false
+      },
+      {
+        "user": "one result per month for each region and facility",
+        "assistant": "I understand that the target is Pakistan electricity demand, using our data catalog, every 1 month, for the next 12 months, with values measured in megawatt hours, reported as one result per month for each region and facility. Can I confirm these requirements? Example answer: yes.",
+        "elapsed_ms": 6064.3,
+        "pending_slot": null,
+        "ready": true
+      },
+      {
+        "user": "yes",
+        "assistant": "Confirmed. The forecasting requirements are complete.",
+        "elapsed_ms": 22.15,
+        "pending_slot": null,
+        "ready": true
+      }
+    ],
+    "failure": null,
+    "discovery_elapsed_ms": 1547.52,
+    "query": {
+      "target": "Pakistan electricity demand forecast Pakistan electricity demand",
+      "prompt": "forecast Pakistan electricity demand Pakistan electricity demand",
+      "geography": [],
+      "frequency": "monthly",
+      "history_start": null,
+      "history_end": null,
+      "minimum_training_points": 30,
+      "maximum_staleness_days": null,
+      "purpose": "production",
+      "source_mode": "catalog",
+      "source_reference": null,
+      "license_hint": null,
+      "contains_sensitive_data": false,
+      "user_id": "live-evaluation-user",
+      "latitude": null,
+      "longitude": null
+    },
+    "recommendations": [],
+    "unavailable_count": 0,
+    "source_errors": {},
+    "fetch_status": "not_attempted_no_eligible_recommendation"
+  }
+]

@@ -1,0 +1,421 @@
+[
+  {
+    "scenario_id": "catalog-pakistan-inflation",
+    "title": "Pakistan inflation from the catalog",
+    "dialogue_id": "dc7cda90-661d-46df-9612-16149cd4e2b7",
+    "turn_count": 8,
+    "total_elapsed_ms": 52641.38,
+    "transcript": [
+      {
+        "user": "I want to forecast Pakistan's inflation rate annually for the next 5 years using your data catalog.",
+        "assistant": "You said 5 but that was rejected—how many future periods should we predict (a positive whole number of annual periods)? Example answer: 7 days",
+        "elapsed_ms": 8715.28,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      },
+      {
+        "user": "5 years",
+        "assistant": "How far into the future should we predict? Example answer: 7 days.",
+        "elapsed_ms": 5698.29,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      },
+      {
+        "user": "5 years",
+        "assistant": "How far into the future should we predict? Example answer: 7 days.",
+        "elapsed_ms": 5459.47,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      },
+      {
+        "user": "5 years",
+        "assistant": "How far into the future should we predict? Example answer: 7 days.",
+        "elapsed_ms": 6202.68,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      },
+      {
+        "user": "5 years",
+        "assistant": "How far into the future should we predict? Example answer: 7 days.",
+        "elapsed_ms": 5813.73,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      },
+      {
+        "user": "5 years",
+        "assistant": "How far into the future should we predict? Example answer: 7 days.",
+        "elapsed_ms": 7962.37,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      },
+      {
+        "user": "5 years",
+        "assistant": "How far into the future should we predict? Example answer: 7 days.",
+        "elapsed_ms": 6174.08,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      },
+      {
+        "user": "5 years",
+        "assistant": "How many annual periods should we predict into the future (enter a positive whole number, e.g., 5 for five years)? Example answer: 7 days",
+        "elapsed_ms": 6611.17,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      }
+    ],
+    "failure": "dialogue did not reach explicit confirmation within 8 turns"
+  },
+  {
+    "scenario_id": "catalog-india-life-expectancy-clarification",
+    "title": "India life expectancy with a clarification request",
+    "dialogue_id": "77767f3d-84ef-4c0a-9e3d-d07192bf2cf4",
+    "turn_count": 8,
+    "total_elapsed_ms": 36984.63,
+    "transcript": [
+      {
+        "user": "Please predict India's overall life expectancy each year for the next 5 years from the data catalog.",
+        "assistant": "How will the data be provided: upload, api, database, or catalog? Example answer: upload a file",
+        "elapsed_ms": 5606.16,
+        "pending_slot": "source_mode",
+        "ready": false
+      },
+      {
+        "user": "What do you mean by that?",
+        "assistant": "I mean: tell me how you want to give me the data I need to make the life-expectancy forecast. Pick one of these four options and reply with that word:\n\n- upload — you will upload a file (CSV, Excel, etc.).\n- api — I should connect to an online service / API to fetch the data.\n- database — I should connect to a database (e.g., PostgreSQL).\n- catalog — choose a dataset already in our data catalog.\n\nExample answer: upload a file\n\nWhat do you mean by that? Example answer: upload a file",
+        "elapsed_ms": 3724.68,
+        "pending_slot": "source_mode",
+        "ready": false
+      },
+      {
+        "user": "the catalog",
+        "assistant": "Do you want the system to create a time-series forecast (predict future life expectancy values for each year)? Example answer: yes",
+        "elapsed_ms": 4574.13,
+        "pending_slot": "intent",
+        "ready": false
+      },
+      {
+        "user": "yes",
+        "assistant": "Please answer the question using one of the choices described.",
+        "elapsed_ms": 2685.18,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      },
+      {
+        "user": "5 years",
+        "assistant": "What would you like the system to predict (briefly describe the quantity, e.g., 'India overall life expectancy by year')? Example answer: forecast Bitcoin daily closing price",
+        "elapsed_ms": 4438.54,
+        "pending_slot": "problem_statement",
+        "ready": false
+      },
+      {
+        "user": "forecast India's overall life expectancy",
+        "assistant": "Do you mean the national average life expectancy at birth for India measured once per calendar year (yes or clarify)? Example answer: Bitcoin daily closing price",
+        "elapsed_ms": 6730.09,
+        "pending_slot": "target_description",
+        "ready": false
+      },
+      {
+        "user": "India's overall life expectancy",
+        "assistant": "What unit is the target measured in (for example, years for life expectancy)? Example answer: USD per Bitcoin",
+        "elapsed_ms": 4485.19,
+        "pending_slot": "target_unit",
+        "ready": false
+      },
+      {
+        "user": "years of life expectancy",
+        "assistant": "How should the results be grouped: one value per year for India, or something else (describe briefly)? Example answer: one result per day for each item",
+        "elapsed_ms": 4736.69,
+        "pending_slot": "output_granularity",
+        "ready": false
+      }
+    ],
+    "failure": "dialogue did not reach explicit confirmation within 8 turns"
+  },
+  {
+    "scenario_id": "catalog-bitcoin-daily",
+    "title": "Bitcoin daily price forecast",
+    "dialogue_id": "a25ac0e7-26f9-443b-8188-c749c1cb274a",
+    "turn_count": 8,
+    "total_elapsed_ms": 70682.01,
+    "transcript": [
+      {
+        "user": "Forecast the Bitcoin price every day for the next 30 days using the catalog, with one price for Bitcoin in USD.",
+        "assistant": "How far into the future should we predict? Example answer: 7 days.",
+        "elapsed_ms": 11092.76,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      },
+      {
+        "user": "30 days",
+        "assistant": "How will the data be provided: upload a file, connect to an online service, use a database, or choose from our data list? Example answer: upload a file.",
+        "elapsed_ms": 8253.21,
+        "pending_slot": "source_mode",
+        "ready": false
+      },
+      {
+        "user": "from your data list",
+        "assistant": "How far into the future should we predict? Example answer: 7 days.",
+        "elapsed_ms": 7959.3,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      },
+      {
+        "user": "30 days",
+        "assistant": "How far into the future should we predict? Example answer: 7 days.",
+        "elapsed_ms": 8393.29,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      },
+      {
+        "user": "30 days",
+        "assistant": "How far into the future should we predict? Example answer: 7 days.",
+        "elapsed_ms": 8937.84,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      },
+      {
+        "user": "30 days",
+        "assistant": "How far into the future should we predict? Example answer: 7 days.",
+        "elapsed_ms": 8431.58,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      },
+      {
+        "user": "30 days",
+        "assistant": "How far into the future should we predict? Example answer: 7 days.",
+        "elapsed_ms": 8910.93,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      },
+      {
+        "user": "30 days",
+        "assistant": "How far into the future should we predict? Example answer: 7 days.",
+        "elapsed_ms": 8698.28,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      }
+    ],
+    "failure": "dialogue did not reach explicit confirmation within 8 turns"
+  },
+  {
+    "scenario_id": "catalog-pakistan-gdp",
+    "title": "Pakistan GDP growth forecast",
+    "dialogue_id": "9d81b4f0-56a0-4c60-8bd3-d4d2782c9b54",
+    "turn_count": 5,
+    "total_elapsed_ms": 21479.88,
+    "transcript": [
+      {
+        "user": "I need a forecast of Pakistan's GDP growth for the next 3 years using the system catalog.",
+        "assistant": "What does the target variable represent? Example answer: Bitcoin daily closing price.",
+        "elapsed_ms": 7630.29,
+        "pending_slot": "target_description",
+        "ready": false
+      },
+      {
+        "user": "Pakistan's GDP growth",
+        "assistant": "What unit is the target measured in? Example answer: USD per Bitcoin.",
+        "elapsed_ms": 5515.87,
+        "pending_slot": "target_unit",
+        "ready": false
+      },
+      {
+        "user": "percent",
+        "assistant": "Do you want the forecast at an annual level (one value per year) or more detailed (quarterly or monthly) over the next 3 years? Example answer: one result per day for each item",
+        "elapsed_ms": 6015.37,
+        "pending_slot": "output_granularity",
+        "ready": false
+      },
+      {
+        "user": "one value per year",
+        "assistant": "I understand that the target is Pakistan's GDP growth, for Pakistan, using our data catalog, for the next {'periods': 3.0, 'units': 'years'}, with values measured in percent, reported as one value per year. Can I confirm these requirements? Example answer: yes.",
+        "elapsed_ms": 2294.59,
+        "pending_slot": null,
+        "ready": true
+      },
+      {
+        "user": "yes",
+        "assistant": "Confirmed. The forecasting requirements are complete.",
+        "elapsed_ms": 21.94,
+        "pending_slot": null,
+        "ready": true
+      }
+    ],
+    "failure": null,
+    "discovery_elapsed_ms": 2644.93,
+    "query": {
+      "target": "Pakistan's GDP growth {'text': \"Forecast Pakistan's GDP growth\"}",
+      "prompt": "{'text': \"Forecast Pakistan's GDP growth\"} Pakistan's GDP growth",
+      "geography": [
+        "Pakistan"
+      ],
+      "frequency": null,
+      "history_start": null,
+      "history_end": null,
+      "minimum_training_points": 30,
+      "maximum_staleness_days": null,
+      "purpose": "production",
+      "source_mode": "catalog",
+      "source_reference": null,
+      "license_hint": null,
+      "contains_sensitive_data": false,
+      "user_id": "live-evaluation-user",
+      "latitude": null,
+      "longitude": null
+    },
+    "recommendations": [
+      {
+        "candidate_id": "3de6af370c1e00ed85168ee6",
+        "title": "World Bank - GDP growth, annual % (NY.GDP.MKTP.KD.ZG)",
+        "publisher": "World Bank",
+        "score": 62.67,
+        "eligible": true,
+        "limitations": [
+          "Dependency scores are priors or measured associations, not causal claims."
+        ],
+        "source_url": "https://api.worldbank.org/v2/country/all/indicator/NY.GDP.MKTP.KD.ZG?format=json&per_page=100&date=2015:2025"
+      }
+    ],
+    "unavailable_count": 0,
+    "source_errors": {},
+    "selected_candidate_id": "3de6af370c1e00ed85168ee6",
+    "fetch_status": "succeeded",
+    "dataset_version": {
+      "sha256": "7196d4dc5cf4ecd921579b2ef301cd808e0b30cf2019355afc58893dff86c11c",
+      "content_type": "application/json",
+      "byte_size": 23509,
+      "source_version": "Tue, 20 Oct 2026 03:07:05 GMT"
+    }
+  },
+  {
+    "scenario_id": "upload-store-sales",
+    "title": "Uploaded store sales dataset",
+    "dialogue_id": "1ab7fce7-3263-41bb-b4c6-37a13342ca7d",
+    "turn_count": 8,
+    "total_elapsed_ms": 78205.96,
+    "transcript": [
+      {
+        "user": "I want to forecast store sales monthly for the next 12 months from my uploaded file.",
+        "assistant": "Which column tells us when each observation happened? Example answer: date.",
+        "elapsed_ms": 9769.78,
+        "pending_slot": "time_column",
+        "ready": false
+      },
+      {
+        "user": "date",
+        "assistant": "Which column contains the value you want to predict? Example answer: date.",
+        "elapsed_ms": 8132.84,
+        "pending_slot": "target_column",
+        "ready": false
+      },
+      {
+        "user": "sales",
+        "assistant": "How often is a new observation recorded? Example answer: once per day.",
+        "elapsed_ms": 8855.92,
+        "pending_slot": "frequency",
+        "ready": false
+      },
+      {
+        "user": "monthly",
+        "assistant": "How far into the future should we predict? Example answer: 12 months.",
+        "elapsed_ms": 8708.71,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      },
+      {
+        "user": "12 months",
+        "assistant": "What would you like the system to predict? Example answer: forecast Bitcoin daily closing price.",
+        "elapsed_ms": 8378.45,
+        "pending_slot": "problem_statement",
+        "ready": false
+      },
+      {
+        "user": "forecast store sales",
+        "assistant": "What does the target variable represent? Example answer: Bitcoin daily closing price.",
+        "elapsed_ms": 9740.49,
+        "pending_slot": "target_description",
+        "ready": false
+      },
+      {
+        "user": "store sales",
+        "assistant": "Does your data cover one item, several separate items, or groups with levels? Example answer: several separate items.",
+        "elapsed_ms": 10550.25,
+        "pending_slot": "dataset_type",
+        "ready": false
+      },
+      {
+        "user": "several separate items",
+        "assistant": "What unit is the target measured in? Example answer: USD per Bitcoin.",
+        "elapsed_ms": 14064.9,
+        "pending_slot": "target_unit",
+        "ready": false
+      }
+    ],
+    "failure": "dialogue did not reach explicit confirmation within 8 turns"
+  },
+  {
+    "scenario_id": "catalog-hierarchical-energy",
+    "title": "Hierarchical Pakistan energy demand",
+    "dialogue_id": "72a9bfd5-8f1e-429d-9810-588b86836419",
+    "turn_count": 8,
+    "total_elapsed_ms": 59346.68,
+    "transcript": [
+      {
+        "user": "Forecast Pakistan electricity demand monthly for the next 12 months from the catalog, across regions and facilities.",
+        "assistant": "How will the data be provided: upload, api, database, or catalog? Example answer: upload a file",
+        "elapsed_ms": 4457.93,
+        "pending_slot": "source_mode",
+        "ready": false
+      },
+      {
+        "user": "use the catalog",
+        "assistant": "Do you want the system to create a time-series forecast? Example answer: yes.",
+        "elapsed_ms": 9571.16,
+        "pending_slot": "intent",
+        "ready": false
+      },
+      {
+        "user": "yes",
+        "assistant": "Please answer the question using one of the choices described.",
+        "elapsed_ms": 5717.72,
+        "pending_slot": "forecast_horizon",
+        "ready": false
+      },
+      {
+        "user": "12 months",
+        "assistant": "What would you like the system to predict? Example answer: forecast Bitcoin daily closing price.",
+        "elapsed_ms": 7007.87,
+        "pending_slot": "problem_statement",
+        "ready": false
+      },
+      {
+        "user": "forecast Pakistan electricity demand",
+        "assistant": "What does the target variable represent? Example answer: Bitcoin daily closing price.",
+        "elapsed_ms": 7726.5,
+        "pending_slot": "target_description",
+        "ready": false
+      },
+      {
+        "user": "Pakistan electricity demand",
+        "assistant": "What unit is the target measured in? Example answer: USD per Bitcoin.",
+        "elapsed_ms": 8868.02,
+        "pending_slot": "target_unit",
+        "ready": false
+      },
+      {
+        "user": "megawatt hours",
+        "assistant": "How should results be grouped by time and item? Example answer: one result per day for each item.",
+        "elapsed_ms": 10213.47,
+        "pending_slot": "output_granularity",
+        "ready": false
+      },
+      {
+        "user": "one result per month for each region and facility",
+        "assistant": "I understand that the target is Pakistan electricity demand, using our data catalog, for the next 12 months, with values measured in megawatt hours, reported as one result per month for each region and facility. Can I confirm these requirements? Example answer: yes.",
+        "elapsed_ms": 5779.94,
+        "pending_slot": null,
+        "ready": true
+      }
+    ],
+    "failure": "dialogue did not reach explicit confirmation within 8 turns"
+  }
+]

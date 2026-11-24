@@ -27,13 +27,25 @@ _DURATION_UNITS = {
     "quarter": "quarter",
     "quarters": "quarter",
     "quarterly": "quarter",
+    "annual": "year",
+    "annually": "year",
     "year": "year",
     "years": "year",
     "yearly": "year",
 }
 _DURATION_TEXT_PATTERN = re.compile(
     r"\s*(?:(?:for|over)\s+)?(?:(?:the\s+)?(?:next|following)\s+)?"
-    r"(?:(?P<number>\d+(?:\.\d+)?)|(?:a|an|one))?\s*(?P<unit>[a-zA-Z]+)\s*",
+    r"(?:(?P<number>\d+(?:\.\d+)?)|(?:a|an|one)\b)?\s*(?P<unit>[a-zA-Z]+)\s*",
+    re.IGNORECASE,
+)
+_EXPLICIT_FREQUENCY_PATTERN = re.compile(
+    r"\b(?:daily|weekly|monthly|quarterly|annually|yearly|hourly|minutely|"
+    r"(?:once\s+)?(?:every|each|per)\s+(?:\d+(?:\.\d+)?\s+)?[a-zA-Z]+)\b",
+    re.IGNORECASE,
+)
+_FORECAST_HORIZON_PATTERN = re.compile(
+    r"\b(?:next|following|coming)\s+"
+    r"(?P<duration>(?:\d+(?:\.\d+)?|a|an|one)\s+[a-zA-Z]+)\b",
     re.IGNORECASE,
 )
 
@@ -111,6 +123,36 @@ def _duration_from_text(value: str) -> dict[str, Any] | None:
     if unit is None:
         return None
     return {"periods": float(match.group("number") or 1), "unit": unit}
+
+
+def _duration_unit_from_text(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = " ".join(value.strip().split()).casefold()
+    for token, unit in sorted(_DURATION_UNITS.items(), key=lambda item: -len(item[0])):
+        if re.search(rf"\b{re.escape(token)}\b", normalized):
+            return unit
+    return None
+
+
+def extract_explicit_frequency(value: str) -> tuple[dict[str, Any], str] | None:
+    for match in _EXPLICIT_FREQUENCY_PATTERN.finditer(value):
+        evidence = match.group(0)
+        duration = _duration_from_text(evidence)
+        if duration is not None:
+            return duration, evidence
+    return None
+
+
+def extract_explicit_forecast_horizon(value: str) -> tuple[dict[str, Any], str] | None:
+    match = _FORECAST_HORIZON_PATTERN.search(value)
+    if match is None:
+        return None
+    evidence = match.group(0)
+    duration = _duration_from_text(match.group("duration"))
+    if duration is None:
+        return None
+    return duration, evidence
 
 
 def _enum_key(value: Any) -> str:
@@ -207,6 +249,8 @@ def normalize_value(definition: SlotDefinition, value: Any) -> Any:
             return _duration_from_text(value) or value
         if isinstance(value, dict):
             duration = dict(value)
+            if "unit" not in duration and "units" in duration:
+                duration["unit"] = duration.pop("units")
             try:
                 duration["periods"] = float(duration["periods"])
             except (KeyError, TypeError, ValueError):
@@ -220,6 +264,32 @@ def normalize_value(definition: SlotDefinition, value: Any) -> Any:
         except ValueError:
             return value
     return value
+
+
+def normalize_extracted_value(
+    definition: SlotDefinition,
+    value: Any,
+    *,
+    evidence_text: str | None = None,
+    current_message: str | None = None,
+) -> Any:
+    """Normalize provider output using the evidence that accompanied it.
+
+    Providers sometimes return the numeric part of a duration separately from
+    its unit. The application has the original evidence and user message, so
+    it can safely restore the canonical duration shape before validation.
+    """
+    if (
+        definition.value_type == "duration"
+        and isinstance(value, (int, float))
+        and not isinstance(value, bool)
+    ):
+        unit = _duration_unit_from_text(evidence_text) or _duration_unit_from_text(
+            current_message
+        )
+        if unit is not None:
+            return {"periods": float(value), "unit": unit}
+    return normalize_value(definition, value)
 
 
 def is_iana_timezone(value: Any) -> bool:

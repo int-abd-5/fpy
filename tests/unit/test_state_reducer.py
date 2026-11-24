@@ -3,8 +3,8 @@ from copy import deepcopy
 import pytest
 
 from forecasting_assistant.application.state_reducer import (
-    UnsupportedEvidenceError,
     UnknownSlotError,
+    UnsupportedEvidenceError,
     apply_extraction,
 )
 from forecasting_assistant.domain.models import (
@@ -346,6 +346,51 @@ def test_natural_language_duration_update_is_valid() -> None:
     assert updated.slots["forecast_horizon"].value == {"periods": 10.0, "unit": "day"}
     assert updated.slots["forecast_horizon"].status == SlotStatus.PROVIDED
     assert updated.slots["forecast_horizon"].validation_errors == []
+
+
+def test_numeric_duration_candidate_uses_unit_from_evidence() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+
+    updated = apply_extraction(
+        state,
+        _result(
+            "forecast_horizon",
+            5,
+            evidence="5 years",
+        ),
+        schema,
+        1,
+        "5 years",
+    )
+
+    assert updated.slots["forecast_horizon"].value == {
+        "periods": 5.0,
+        "unit": "year",
+    }
+    assert updated.slots["forecast_horizon"].status == SlotStatus.PROVIDED
+    assert updated.slots["forecast_horizon"].validation_errors == []
+
+
+def test_initial_time_phrases_fill_unmentioned_frequency_and_horizon() -> None:
+    schema = load_schema()
+    state = create_initial_state(schema)
+
+    updated = apply_extraction(
+        state,
+        ExtractorResult(intent=Intent.CREATE_FORECAST, intent_confidence=0.99),
+        schema,
+        1,
+        "Forecast Pakistan inflation annually for the next 5 years.",
+    )
+
+    assert updated.slots["frequency"].value == {"periods": 1.0, "unit": "year"}
+    assert updated.slots["forecast_horizon"].value == {
+        "periods": 5.0,
+        "unit": "year",
+    }
+    assert updated.slots["frequency"].status == SlotStatus.PROVIDED
+    assert updated.slots["forecast_horizon"].status == SlotStatus.PROVIDED
 
 
 def test_top_level_forecast_intent_populates_required_intent_slot() -> None:

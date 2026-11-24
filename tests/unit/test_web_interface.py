@@ -20,6 +20,8 @@ def test_dashboard_html_exposes_demo_panels() -> None:
     html = dashboard_html()
 
     assert "Forecast Studio" in html
+    assert '<section class="chat-shell">' in html
+    assert '<section class="insight-shell">' in html
     assert "Upload data" in html
     assert "Data catalog" in html
     assert "Fetch dataset" in html

@@ -154,18 +154,25 @@ def test_search_builds_explicit_resolve_payload_from_query() -> None:
 
     adapter.search(
         DatasetSearchQuery(
-            target="inflation",
+            target="macro.inflation",
+            prompt=(
+                "Predict Pakistan's inflation rate using the previous year's inflation value "
+                "and year-over-year inflation change"
+            ),
             geography=["Pakistan"],
-            frequency="monthly",
+            frequency="annual",
         )
     )
 
     assert client.payloads == [
         {
-            "prompt": "inflation",
-            "fields": ["inflation"],
-            "geo": "Pakistan",
-            "frequency": "monthly",
+            "prompt": (
+                "Predict Pakistan's inflation rate using the previous year's inflation value "
+                "and year-over-year inflation change"
+            ),
+            "target": "macro.inflation",
+            "geo": "country",
+            "frequency": "annual",
             "min_relevance": 0.85,
             "min_companion_strength": 0.70,
             "max_dependency_depth": 3,
@@ -173,6 +180,24 @@ def test_search_builds_explicit_resolve_payload_from_query() -> None:
             "include_pending": False,
         }
     ]
+
+
+def test_search_canonicalizes_natural_language_inflation_target() -> None:
+    client = FakeRegistryClient(
+        {"target_sources": [], "companion_sources": [], "lineage": [], "warnings": []}
+    )
+    adapter = RegistryDatasetAdapter(client, FakeHttp(), settings=Settings(_env_file=None))
+
+    adapter.search(
+        DatasetSearchQuery(
+            target="percentage increase of inflation from the last year in Pakistan",
+            geography=["Pakistan"],
+            frequency="annual",
+        )
+    )
+
+    assert client.payloads[0]["target"] == "macro.inflation"
+    assert client.payloads[0]["geo"] == "country"
 
 
 def test_fetch_uses_secure_http_client_and_preserves_registry_metadata() -> None:
